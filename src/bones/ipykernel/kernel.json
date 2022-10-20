@@ -1,0 +1,10 @@
+{
+  "argv": [
+    "python3.8",
+    "/Users/david/repos/github/DangerMouseB/examples/src/bones/ipykernel/bones_kernel.py",
+    "-f",
+    "{connection_file}"
+  ],
+  "display_name": "bones",
+  "language": "bones"
+}
