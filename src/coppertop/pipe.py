@@ -32,7 +32,7 @@ import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 __all__ = [
-    'coppertop', 'nullary', 'unary', 'binary', 'ternary', '_', 'sig', 'context', 'typeOf', 'makeFn'
+    'coppertop', 'nullary', 'unary', 'binary', 'ternary', '_', 'sig', 'context', 'typeOf', 'makeFn', 'GROOT_NS'
 ]
 
 
@@ -76,8 +76,8 @@ _ = _UNDERSCORE
 MANDATORY = inspect._empty    # this is the sentinel python uses to indicate that an argument has no default (i.e. is optional)
 NO_ANNOTATION = inspect._empty    # this is the sentinel python uses to indicate that an argument has no annotation
 BETTER_ERRORS = False
-DEFAULT_BMODNAME = 'scratch'
-ROOT_BMODNAME = ''
+DEFAULT_NS = 'scratch'
+GROOT_NS = ''
 ANON_NAME = '<lambda>'
 
 _SCTracker = []
@@ -104,7 +104,7 @@ def makeFn(*args):
     bmodname, pymodname, fnname, priorMF, definedInFunction, argNames, sig, tRet, pass_tByT = _fnContext(pyfn, 'anon', name)
     if _t is Missing:
         _t = BTFn(BTTuple(*[py] * len(argNames)), py)
-    bmodname = DEFAULT_BMODNAME if bmodname is Missing else bmodname
+    bmodname = DEFAULT_NS if bmodname is Missing else bmodname
     fn = _Function(
         name=fnname, bmodname=bmodname, pymodname=pymodname,
         style=unary, pyfn=pyfn, dispatchEvenIfAllTypes=False, typeHelper=Missing, _t=_t, argNames=argNames, pass_tByT=False
@@ -137,7 +137,7 @@ def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEv
                 else:
                     bmodname = priorMF.d.bmodname
             else:
-                bmodname = DEFAULT_BMODNAME
+                bmodname = DEFAULT_NS
 
         # create dispatcher
         fn = _Function(fnname, bmodname, pymodname, style_, pyfn, dispatchEvenIfAllTypes, typeHelper, BTFn(sig, tRet), argNames, pass_tByT)
@@ -162,7 +162,7 @@ def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEv
                 if bmodule is Missing:
                     bmodule = BModule(bmodname)
                     sys._bmodules[bmodname] = bmodule
-                    if bmodname != ROOT_BMODNAME:
+                    if bmodname != GROOT_NS:
                         splits = bmodname.split('.')
                         parentname = ''
                         for subname in splits:
@@ -525,7 +525,7 @@ def _typeOf(x):
 # public functions
 
 
-typeOf = coppertop(name='typeOf', module='')(_typeOf)
+typeOf = coppertop(name='typeOf', module=GROOT_NS)(_typeOf)
 
 
 def _sig(x):
@@ -543,7 +543,7 @@ def _sig(x):
         retT = _ppType(x._tRet)
         return f'({",".join(argTs)})->{retT} <{x.style.name}>  :   in {x.fullname}'
 
-sig = coppertop(name='sig', module='')(_sig)
+sig = coppertop(name='sig', module=GROOT_NS)(_sig)
 
 
 
