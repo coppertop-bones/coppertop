@@ -125,10 +125,10 @@ def _selectFunction(callerSig, fnBySig, nameForError, fnBySigByNumArgsForError):
 def _cantFindMatchError(sig, nameForError, fnBySigByNumArgsForError):
     with context(showFullType=True):
         # DOES_NOT_UNDERSTAND
-        print(f"Can't find {_ppFn(nameForError, sig)} in:", file=sys.stderr)
+        context.EE(f"Can't find {_ppFn(nameForError, sig)} in:")
         for fnBySig in fnBySigByNumArgsForError:
             for fnSig, fn in fnBySig.items():
-                print(f'  {_ppFn(fn.name, fnSig)} in {fn.bmodname} - {fn.fullname}', file=sys.stderr)
+                context.EE(f'  {_ppFn(fn.name, fnSig)} in {fn.bmodname} - {fn.fullname}')
 
     return TypeError(f"Can't find {_ppFn(nameForError, sig)}")
 
