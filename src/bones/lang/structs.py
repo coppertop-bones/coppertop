@@ -36,7 +36,7 @@ from collections import UserList, UserDict
 
 from bones.core.errors import NotYetImplemented, ProgrammerError, PathNotTested
 from bones.core.sentinels import Missing, Void
-from bones.lang.metatypes import BType
+from bones.lang.metatypes import BType, fitsWithin, cacheAndUpdate
 from bones.lang.utils import Constructors
 
 
@@ -456,32 +456,6 @@ class bmap_(UserDict):
 
 
 class bframe_(bstruct_): pass
-
-
-class Holder(object):
-    # a rebindable holder of a union and a tv
-    __slots__ = ['_st_', '_tv_']
-    def __init__(self, _st, *args):
-        self._st_ = _st
-        self._tv_ = args[0] if len(args) == 1 else Void
-    def __setattr__(self, key, value):
-        if key in ('_st_', '_tv_'):
-            Holder.__dict__[key].__set__(self, value)
-        elif key == '_tv':
-            if not isinstance(value, self._st_): raise TypeError()
-            Holder.__dict__['_tv_'].__set__(self, value)
-        else:
-            raise AttributeError()
-    @property
-    def _st(self):
-        return self._st_
-    @property
-    def _tv(self):
-        tv = self._tv_
-        if tv is Void: raise ProgrammerError("Trying to access a value before setting it")
-        return self._tv_
-    def __repr__(self):
-        return f'Holder({self._st_},{self._tv_})'
 
 
 class tv(object):

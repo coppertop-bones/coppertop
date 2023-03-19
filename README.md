@@ -7,6 +7,14 @@ Coppertop provides an alternative programming experience in Python via the follo
 * piping syntax
 * an embryonic [core library](https://github.com/coppertop-bones/dm/tree/main/src/dm) of common functions
 
+<br>
+
+
+### Installation
+
+`pip install coppertop-std` for the dangermouse core library and the @coppertop decorator.\
+`pip install coppertop-bones` just for the @coppertop decorator.
+
 
 <br>
 
@@ -124,7 +132,7 @@ def op(x, action, y):
 syntax: `A >> f(args) >> B >> C` -> `f(args)(A, B, C)`
 
 ```
-from groot import both, check, equal
+from groot import both, check, equals
 
 actual = [1,2] >> both >> (lambda x, y: x + y) >> [3,4]
 assert (1 >> equal >> 1) == True
@@ -145,7 +153,7 @@ for example game input.
 
 ### a whimsical exercise for the ambitious
 
-(both, collect, inject, addOne, appendStr, check, equal are all illustrated above)
+(both, collect, inject, addOne, appendStr, check, equals are all illustrated above)
 
 ```
 from groot import to

@@ -48,10 +48,9 @@ from coppertop import BModule
 from coppertop._scopes import _CoWProxy, _UNDERSCORE
 from bones.core.errors import ProgrammerError, ErrSite, CPTBError
 from bones.core.sentinels import Missing
-from bones.core.utils import firstKey
+from bones.core.utils import firstKey, raiseLess
 from bones.lang.metatypes import BType, fitsWithin, cacheAndUpdate, BTFn, BTTuple, BTAtom, BTOverload, _BTypeById, _aliases
 from bones.lang.types import nullary, unary, binary, ternary, void, obj
-from bones.core.utils import raiseLess
 from bones.lang.select import _ppType, _selectFunction
 
 

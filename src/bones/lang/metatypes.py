@@ -950,7 +950,7 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
             cacheId = (a.id, b.id)
         else:
             if not isinstance(a, type):
-                raise TypeError(f"a is type {a.__class__}")
+                raise TypeError(f"a is type {a.__class__} b is {repr(b)}")
             cacheId = (a, b.id)
 
 

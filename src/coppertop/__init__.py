@@ -27,8 +27,10 @@
 #
 # **********************************************************************************************************************
 
+import sys
+if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
-import builtins, sys, types
+import builtins, types
 from bones import jones
 
 

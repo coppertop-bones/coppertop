@@ -27,8 +27,9 @@
 #
 # **********************************************************************************************************************
 
+import sys
+if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
-import sys, time
 from bones.core.context import context
 from bones.core.sentinels import Missing
 from bones.core.errors import ProgrammerError, ErrSite

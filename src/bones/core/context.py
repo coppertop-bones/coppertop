@@ -28,6 +28,8 @@
 # **********************************************************************************************************************
 
 import sys
+if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
+
 from contextlib import contextmanager as _contextmanager
 from bones.core.sentinels import Missing
 from bones.core.errors import ProgrammerError
