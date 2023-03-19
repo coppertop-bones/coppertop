@@ -55,6 +55,7 @@ class _Context(object):
         return sys._ContextStack.get(name, [Missing])[-1]
 
     def __setattr__(self, name, value):
+        # if there is no context for the name, i.e.  established via with `context(name=val):`, then this have no effect
         sys._ContextStack.get(name, [Missing])[-1] = value
 
 
@@ -74,3 +75,12 @@ def _setContext(*args, **kwargs):
                 del sys._ContextStack[k]
 
 context = _Context()
+
+
+if __name__ == '__main__':
+    with context(fred=1):
+        assert context.fred == 1
+        context.fred += 1
+        assert context.fred == 2
+    assert context.fred is Missing
+    print('passed')
