@@ -199,20 +199,48 @@ PyMODINIT_FUNC PyInit_jones(void) {
         return NULL;
     }
 
-    if (PyType_Ready(&RauCls) < 0) return NULL;
-    if (PyModule_AddObject(m, "_rau", (PyObject *) &RauCls) < 0) {
-        Py_DECREF(&RauCls);
+    if (PyType_Ready(&PNullaryCls) < 0) return NULL;
+    if (PyModule_AddObject(m, "_pnullary", (PyObject *) &PNullaryCls) < 0) {
+        Py_DECREF(&PNullaryCls);
         Py_DECREF(m);
         return NULL;
     }
 
+    if (PyType_Ready(&PUnaryCls) < 0) return NULL;
+    if (PyModule_AddObject(m, "_punary", (PyObject *) &PUnaryCls) < 0) {
+        Py_DECREF(&PUnaryCls);
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    if (PyType_Ready(&PBinaryCls) < 0) return NULL;
+    if (PyModule_AddObject(m, "_pbinary", (PyObject *) &PBinaryCls) < 0) {
+        Py_DECREF(&PBinaryCls);
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    if (PyType_Ready(&PTernaryCls) < 0) return NULL;
+    if (PyModule_AddObject(m, "_pternary", (PyObject *) &PTernaryCls) < 0) {
+        Py_DECREF(&PTernaryCls);
+        Py_DECREF(m);
+        return NULL;
+    }
+
+//    if (PyType_Ready(&RauCls) < 0) return NULL;
+//    if (PyModule_AddObject(m, "_rau", (PyObject *) &RauCls) < 0) {
+//        Py_DECREF(&RauCls);
+//        Py_DECREF(m);
+//        return NULL;
+//    }
+
 
     // init the partial classes
-    if (PyType_Ready(&PNullaryCls) < 0) return NULL;
-    if (PyType_Ready(&PUnaryCls) < 0) return NULL;
-    if (PyType_Ready(&PBinaryCls) < 0) return NULL;
-    if (PyType_Ready(&PTernaryCls) < 0) return NULL;
-    if (PyType_Ready(&PRauCls) < 0) return NULL;
+//    if (PyType_Ready(&PNullaryCls) < 0) return NULL;
+//    if (PyType_Ready(&PUnaryCls) < 0) return NULL;
+//    if (PyType_Ready(&PBinaryCls) < 0) return NULL;
+//    if (PyType_Ready(&PTernaryCls) < 0) return NULL;
+//    if (PyType_Ready(&PRauCls) < 0) return NULL;
 
 
     // add ToyCls
