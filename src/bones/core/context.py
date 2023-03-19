@@ -82,18 +82,7 @@ def _PP(x):
     print(x)
     return(x)
 
-def _PPF(x, f):
-    print(f(x))
-    return x
-
-def _PPS(lines):
-    for line in lines:
-        print(line)
-    return lines
-
 sys._ContextStack.setdefault('PP', []).append(_PP)
-sys._ContextStack.setdefault('PPF', []).append(_PPF)
-sys._ContextStack.setdefault('PPS', []).append(_PPS)
 
 if __name__ == '__main__':
     with context(fred=1):

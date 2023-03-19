@@ -32,7 +32,8 @@ import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 __all__ = [
-    'coppertop', 'nullary', 'unary', 'binary', 'ternary', '_', 'sig', 'context', 'typeOf', 'makeFn', 'GROOT_NS'
+    'coppertop', 'nullary', 'unary', 'binary', 'ternary', '_', 'sig', 'context', 'typeOf', 'makeFn', 'GROOT_NS',
+    'fitsWithin', 'type', 'fitsWithin_'
 ]
 
 
@@ -47,9 +48,9 @@ from bones.core.context import context
 from coppertop import BModule
 from coppertop._scopes import _CoWProxy, _UNDERSCORE
 from bones.core.errors import ProgrammerError, ErrSite, CPTBError
-from bones.core.sentinels import Missing
+from bones.core.sentinels import Missing, function
 from bones.core.utils import firstKey, raiseLess
-from bones.lang.metatypes import BType, fitsWithin, cacheAndUpdate, BTFn, BTTuple, BTAtom, BTOverload, _BTypeById, _aliases
+from bones.lang.metatypes import BType, fitsWithin as origFitsWithin, cacheAndUpdate, BTFn, BTTuple, BTAtom, BTOverload, _BTypeById, _aliases
 from bones.lang.types import nullary, unary, binary, ternary, void, obj
 from bones.lang.select import _ppType, _selectFunction
 
@@ -188,7 +189,7 @@ def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEv
         mf.d = d
         return mf
 
-    if len(args) == 1 and isinstance(args[0], (types.FunctionType, types.MethodType, type)):
+    if len(args) == 1 and isinstance(args[0], (types.FunctionType, types.MethodType, builtins.type)):
         # of form @coppertop so args[0] is the function or callable class being decorated
         return registerFn(args[0])
 
@@ -262,7 +263,7 @@ def _tArgFromAnnotation(annotation, bmodname, fnname, msg):
         return annotation
     elif annotation == NO_ANNOTATION:
         return py
-    elif isinstance(annotation, type):
+    elif isinstance(annotation, builtins.type):
         if (tArg := _aliases.get(annotation, Missing)) is Missing:
             name = annotation.__module__ + "." + annotation.__name__
             tArg = BTAtom.ensure(name)
@@ -472,7 +473,7 @@ class _Dispatcher(object):
                 # sequence if the return type is BTTuple (and possibly BTStruct) - also BTTuple can be coerced by default to
                 # a dseq (or similar - may should add a new tuple subclass to prevent it being treated like an exponential)
                 # add a note in bones that one of our basic ideas / building blocks is things and exponentials of things
-                doesFit, tByT, distances = cacheAndUpdate(fitsWithin(_typeOf(answer), _tRet), tByT)
+                doesFit, tByT, distances = cacheAndUpdate(origFitsWithin(_typeOf(answer), _tRet), tByT)
                 if doesFit:
                     # returnTime += time.perf_counter_ns() - t5; returnCount += 1
                     return answer
@@ -515,20 +516,15 @@ def _typeOf(x):
         else:
             return x.d._tPartial(x.num_args, x.o_tbc)
     else:
-        t = type(x)
+        t = builtins.type(x)
         if t is _CoWProxy:
-            t = type(x._target)         # return the type of thing being proxied
+            t = builtins.type(x._target)         # return the type of thing being proxied
         return _aliases.get(t, t)       # type python types as their bones equivalent
 
 
-
-# public functions
-
-
-typeOf = coppertop(name='typeOf', module=GROOT_NS)(_typeOf)
-
-
 def _sig(x):
+    if isinstance(x, function):
+        return f'{x.__name__} is a Python function'
     x = x.d
     if isinstance(x, _Dispatcher):
         answer = []
@@ -543,8 +539,23 @@ def _sig(x):
         retT = _ppType(x._tRet)
         return f'({",".join(argTs)})->{retT} <{x.style.name}>  :   in {x.fullname}'
 
-sig = coppertop(name='sig', module=GROOT_NS)(_sig)
 
+def _fitsWithin(a, b):
+    doesFit, tByT, distances = cacheAndUpdate(origFitsWithin(a, b), {})
+    return doesFit
+
+def _fitsWithin_(a, b):
+    return cacheAndUpdate(origFitsWithin(a, b), {})
+
+def _type(x):
+    return builtins.type(x)
+
+# public functions
+typeOf = coppertop(name='typeOf', dispatchEvenIfAllTypes=True, module=GROOT_NS)(_typeOf)
+sig = coppertop(name='sig', module=GROOT_NS)(_sig)
+fitsWithin = coppertop(name='fitsWithin', style=binary, dispatchEvenIfAllTypes=True, module=GROOT_NS)(_fitsWithin)
+fitsWithin_ = coppertop(name='fitsWithin_', style=binary, dispatchEvenIfAllTypes=True, module=GROOT_NS)(_fitsWithin_)
+type = coppertop(name='type', dispatchEvenIfAllTypes=True, module=GROOT_NS)(_type)
 
 
 
