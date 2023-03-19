@@ -79,7 +79,7 @@ if '_oldImportFnForCoppertop' not in sys.__dict__:
                         if not all:
                             # reconstruct __all__ - only expose functions not types nor values
                             for k, fn in mod.__dict__.items():
-                                if isinstance(fn, (jones._nullary, jones._unary, jones._binary, jones._ternary, jones._rau)):
+                                if isinstance(fn, (jones._nullary, jones._unary, jones._binary, jones._ternary)):
                                     all.append(k)
                             mod.__dict__['__all__'] = all
                     else:
