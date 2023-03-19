@@ -32,7 +32,7 @@ from bones.lang.types import unary
 
 # keep the contexts on the kernel to relieve the burden of type memory management from the storage manager
 
-class Kernel(object):
+class BaseKernel(object):
     def __init__(self, sm):
         self.ctxs = {}
         self.sm = sm
