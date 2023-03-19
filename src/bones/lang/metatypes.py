@@ -1009,7 +1009,7 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
             # (num&fred) + (str&joe)  fitsWithin  (num&fred)
             return (cacheId, False, _, _)
         elif a.__class__ == BTIntersection: # I I
-            # (matrix & square & btup) fitsWithin (matrix & btup & aliased)
+            # (matrix & square & dtup) fitsWithin (matrix & dtup & aliased)
             case = I_I
         else:                               # O I
             # str fitsWithin (str&aliased)    (remember aliased is implicit)

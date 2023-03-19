@@ -38,8 +38,8 @@ __all__ = [
     'noun', 'nullary', 'unary', 'binary', 'ternary',
     'obj',
     'TBI', 'void', 'null',
-    'litint', 'litdec', 'littxt', 'litsym', 'litsyms', 'litdate',
-    'btup', 'bstruct', 'bseq', 'bmap', 'bframe',
+    'tup', 'struct', 'frame',
+    'litint', 'litdec', 'littxt', 'litsym', 'litsyms', 'litdate', 'litframe', 'littup', 'litstruct',
 ]
 
 from bones.core.sentinels import Null, Void
@@ -51,7 +51,6 @@ nullary = BTAtom.define("nullary")
 unary = BTAtom.define("unary")
 binary = BTAtom.define("binary")
 ternary = BTAtom.define("ternary")
-# rau = BTAtom.define("rau")
 
 # obj is used in setOrthogonal to show the type and an object of some sort and thus the intersection with
 # other orthogonal(obj) types is uninhabited
@@ -64,6 +63,11 @@ null = BTAtom.define('null')                        # the null set - something t
 Null._t = null
 Void._t = void
 
+tup = BTAtom.define('tup')
+struct = BTAtom.define('struct')
+frame = BTAtom.define('frame')
+
+
 
 # types used in parser
 litint = BTAtom.define('litint').setOrthogonal(obj)
@@ -72,31 +76,9 @@ littxt = BTAtom.define('littxt').setOrthogonal(obj)      # this allows us to pro
 litsym = BTAtom.define('litsym').setOrthogonal(obj)
 litsyms = BTAtom.define('litsyms').setOrthogonal(obj)
 litdate = BTAtom.define('litdate').setOrthogonal(obj)
-
-# types for the implementation classes
-btup = BTAtom.define('btup').setOrthogonal(obj)
-bstruct = BTAtom.define('bstruct').setOrthogonal(obj)
-bseq = BTAtom.define('bseq').setOrthogonal(obj)
-bmap = BTAtom.define('bmap').setOrthogonal(obj)
-bframe = BTAtom.define('bframe').setOrthogonal(obj)
-
-
-def _addConstructors():
-    from bones.lang.structs import tvarray, bstruct_, bseq_, bmap_, bframe_
-    import bones.lang.structs
-    btup.setConstructor(tvarray)
-    bstruct.setConstructor(bstruct_)
-    bseq.setConstructor(bseq_)
-    bmap.setConstructor(bmap_)
-    bframe.setConstructor(bframe_)
-
-    bones.lang.structs.btup = btup
-    bones.lang.structs.bstruct = bstruct
-    bones.lang.structs.bseq = bseq
-    bones.lang.structs.bmap = bmap
-    bones.lang.structs.bframe = bframe
-
-_addConstructors()
+littup = tup['littup'].setOrthogonal(obj)
+litstruct = struct['litstruct'].setOrthogonal(obj)
+litframe = frame['litframe'].setOrthogonal(obj)
 
 
 

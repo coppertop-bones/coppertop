@@ -470,7 +470,7 @@ class _Dispatcher(object):
                 # MUSTDO
                 # BTTuples are products whereas pytuples are exponentials therefore we can reliably type check an answered
                 # sequence if the return type is BTTuple (and possibly BTStruct) - also BTTuple can be coerced by default to
-                # a bseq (or similar - may should add a new tuple subclass to prevent it being treated like an exponential)
+                # a dseq (or similar - may should add a new tuple subclass to prevent it being treated like an exponential)
                 # add a note in bones that one of our basic ideas / building blocks is things and exponentials of things
                 doesFit, tByT, distances = cacheAndUpdate(fitsWithin(_typeOf(answer), _tRet), tByT)
                 if doesFit:
