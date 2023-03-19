@@ -63,13 +63,15 @@ null = BTAtom.define('null')                        # the null set - something t
 Null._t = null
 Void._t = void
 
+# so we can have more than one class for frames (and tups and structs, maybe less likely)
+# dframe = frame[tvstruct].nameAs('dframe')
+# polarframe = frame[pl.DataFrame].nameAs('polarframe')
 tup = BTAtom.define('tup')
 struct = BTAtom.define('struct')
 frame = BTAtom.define('frame')
 
 
-
-# types used in parser
+# literal types used in parser
 litint = BTAtom.define('litint').setOrthogonal(obj)
 litdec = BTAtom.define('litdec').setOrthogonal(obj)
 littxt = BTAtom.define('littxt').setOrthogonal(obj)      # this allows us to provide different encodings in source and map to the core one
