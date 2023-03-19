@@ -91,7 +91,7 @@ class BonesError(Exception):
 
 class SpellingError(BonesError): pass       # lex errors
 
-class ParagraphError(BonesError):           # grouping errors
+class GroupError(BonesError):           # grouping errors
     def __init__(self, msg, errSite, group, token):
         super().__init__(msg, errSite)
         self._group = group
