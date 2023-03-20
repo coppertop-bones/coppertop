@@ -473,12 +473,7 @@ class BTSchemaVariable(BTAtom):
 
 
 class _BTSetOp(BType):
-
     __slots__ = ['types']
-    def __eq__(self, rhs):
-        return isinstance(rhs, self.__class__) and ((self.id == rhs.id) or (self.types == rhs.types))
-    def __hash__(self):
-        return self.id  # see https://stackoverflow.com/questions/53518981/inheritance-hash-sets-to-none-in-a-subclass
 
 
 
@@ -502,6 +497,13 @@ class BTUnion(_BTSetOp):
             instance.orthogonal = flags.orthogonal
             cls._typeByTypes[types] = instance
         return instance
+
+    def __hash__(self):
+        return self.id  # see https://stackoverflow.com/questions/53518981/inheritance-hash-sets-to-none-in-a-subclass
+
+    def __eq__(self, rhs):
+        # we can be subclassed
+        return isinstance(rhs, BTUnion) and ((self.id == rhs.id) or (self.types == rhs.types))
 
     def __len__(self):
         return len(self.types)
@@ -544,6 +546,13 @@ class BTIntersection(_BTSetOp):
             instance.orthogonal = flags.orthogonal
             cls._typeByTypes[types] = instance
         return instance
+
+    def __hash__(self):
+        return self.id  # see https://stackoverflow.com/questions/53518981/inheritance-hash-sets-to-none-in-a-subclass
+
+    def __eq__(self, rhs):
+        # we can be subclassed
+        return isinstance(rhs, BTIntersection) and ((self.id == rhs.id) or (self.types == rhs.types))
 
     def __sub__(self, rhs):     # self - other
         raise NotYetImplemented()
@@ -850,6 +859,8 @@ class BTMap(BType):
 class BTFn(BType):
     # homogenous, generalised and potentially infinite exponential type - aka function
     BTFnByTypes = {}
+
+    __slots__ = ['tRet', 'tArgs']
 
     def __new__(cls, tArgs, tRet):
         if not isinstance(tArgs, BTTuple):

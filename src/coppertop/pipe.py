@@ -288,21 +288,23 @@ def _tArgFromAnnotation(annotation, bmodname, fnname, msg):
 class _Function(object):
 
     __slots__ = [
-        'style', 'name', '_t_', 'bmodname', 'pymodname', 'pyfn', '_argNames', '_sig', '_tArgs', '_tRet',
+        'style', 'name', '_t', 'bmodname', 'pymodname', 'pyfn', '_argNames', 'sig', 'tArgs', 'tRet',
         'pass_tByT', 'dispatchEvenIfAllTypes', 'typeHelper', '__doc__'
      ]
 
     def __init__(self, name, bmodname, pymodname, style, pyfn, dispatchEvenIfAllTypes, typeHelper, _t, argNames, pass_tByT):
+        if not isinstance(_t, BTFn):
+            0/1
         self.name = name
         self.bmodname = bmodname
         self.pymodname = pymodname
         self.style = style
         self.pyfn = pyfn
         self._argNames = argNames
-        self._sig = _t.tArgs.types
-        self._tArgs = _t.tArgs
-        self._tRet = _t.tRet
-        self._t_ = Missing
+        self._t = _t
+        self.tArgs = _t.tArgs
+        self.tRet = _t.tRet
+        self.sig = _t.tArgs.types
         self.pass_tByT = pass_tByT
         self.dispatchEvenIfAllTypes = dispatchEvenIfAllTypes          # calls the function rather than returns the dispatch when all args are types
         self.typeHelper = typeHelper
@@ -313,22 +315,11 @@ class _Function(object):
         return self.bmodname + '.' + self.name
 
     @property
-    def sig(self):
-        return self._sig
-
-    @property
-    def tRet(self):
-        return self._tRet
+    def numargs(self):
+        return len(self.sig)
 
     def _tPartial(self, o_tbc):
-        sig = self._tArgs.types
-        return BTFn(BTTuple(*(sig[o] for o in o_tbc)), self._tRet)
-
-    @property
-    def _t(self):
-        if self._t_ is Missing:
-            self._t_ = BTFn(self._tArgs, self._tRet)
-        return self._t_
+        return BTFn(BTTuple(*(self.sig[o] for o in o_tbc)), self.tRet)
 
     def __repr__(self):
         return self.name
@@ -458,14 +449,14 @@ class _Dispatcher(object):
                             print(ex.args[0], file=sys.stderr)
                         raiseLess(ex, True)
                         # argTs = [_ppType(argT) for argT in args]
-                        # retT = _ppType(x._tRet)
+                        # retT = _ppType(x.tRet)
                         # return f'({",".join(argTs)})->{retT} <{x.style.name}>  :   in {x.fullname}'
                 else:
                     # dispatchTime += time.perf_counter_ns() - t4; dispatchCount += 1
                     answer = fn.pyfn(*args)
                     # t5 = time.perf_counter_ns()
-            _tRet = fn._tRet
-            if _tRet == py or isinstance(answer, SelectionResult):
+            tRet = fn.tRet
+            if tRet == py or isinstance(answer, SelectionResult):
                 # returnTime += time.perf_counter_ns() - t5; returnCount += 1
                 return answer
             else:
@@ -474,13 +465,12 @@ class _Dispatcher(object):
                 # sequence if the return type is BTTuple (and possibly BTStruct) - also BTTuple can be coerced by default to
                 # a dseq (or similar - may should add a new tuple subclass to prevent it being treated like an exponential)
                 # add a note in bones that one of our basic ideas / building blocks is things and exponentials of things
-                doesFit, tByT, distances = cacheAndUpdate(origFitsWithin(_typeOf(answer), _tRet), tByT)
+                doesFit, tByT, distances = cacheAndUpdate(origFitsWithin(_typeOf(answer), tRet), tByT)
                 if doesFit:
                     # returnTime += time.perf_counter_ns() - t5; returnCount += 1
                     return answer
-                else:
-                    raiseLess(TypeError(
-                        f'{fn.fullname} returned a {str(_typeOf(answer))} should have have returned a {fn._tRet} {tByT}',
+                else:                    raiseLess(TypeError(
+                        f'{fn.fullname} returned a {str(_typeOf(answer))} should have have returned a {fn.tRet} {tByT}',
                         ErrSite("#1")))
         else:
             # dispatchTime += time.perf_counter_ns() - t4; dispatchCount += 1
@@ -532,12 +522,12 @@ def _sig(x):
         for fnBySig in x.fnBySigByNumArgs:
             for sig, d in fnBySig.items():
                 argTs = [_ppType(argT) for argT in sig]
-                retT = _ppType(d._tRet)
+                retT = _ppType(d.tRet)
                 answer.append(f'({",".join(argTs)})->{retT} <{d.style.name}>  :   in {d.fullname}')
         return answer
     else:
         argTs = [_ppType(argT) for argT in x.sig]
-        retT = _ppType(x._tRet)
+        retT = _ppType(x.tRet)
         return f'({",".join(argTs)})->{retT} <{x.style.name}>  :   in {x.fullname}'
 
 
@@ -546,7 +536,9 @@ def _fitsWithin(a, b):
     return doesFit
 
 def _fitsWithin_(a, b):
-    return cacheAndUpdate(origFitsWithin(a, b), {})
+    x = origFitsWithin(a, b)
+    cacheAndUpdate(x, {})
+    return x
 
 def _type(x):
     return builtins.type(x)

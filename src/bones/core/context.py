@@ -82,13 +82,13 @@ def _PP(x):
     print(x)
     return(x)
 
-def _PPE(x):
+def _EE(x):
     print(x, file = sys.stderr)
     return(x)
 
 sys._ContextStack.setdefault('PP', []).append(_PP)
-sys._ContextStack.setdefault('PPE', []).append(_PPE)
-sys._ContextStack.setdefault('EE', []).append(_PPE)
+sys._ContextStack.setdefault('NB', []).append(_EE)
+sys._ContextStack.setdefault('EE', []).append(_EE)
 
 if __name__ == '__main__':
     with context(fred=1):
