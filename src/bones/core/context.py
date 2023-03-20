@@ -96,4 +96,4 @@ if __name__ == '__main__':
         context.fred += 1
         assert context.fred == 2
     assert context.fred is Missing
-    print('passed')
+    print('pass')

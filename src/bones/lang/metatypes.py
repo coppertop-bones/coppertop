@@ -206,12 +206,9 @@ class BType(BTypeRoot):
         # as a constructor and it was hard to diagnose the cause of the bug I was seeing
         if self.hasT:
             raise TypeError(f'{self} has a T so cannot be an instance type')
-        if self._constructor is Missing:
-            self._constructor = fnTV
-        else:
-            if self._constructor is not fnTV and not REPL_OVERRIDE_MODE:
-                # ditto - see setCoercer
-                raise ProgrammerError('constructor already set')
+        if self._constructor is not Missing and fnTV is not self._constructor and not REPL_OVERRIDE_MODE:
+            raise ProgrammerError('constructor already set')
+        self._constructor = fnTV
         return self
 
     def __call__(self, *args, **kwargs):    # type(*args, **kwargs)

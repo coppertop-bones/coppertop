@@ -43,4 +43,4 @@ class BaseKernel(object):
         return self.styleByName.get(name, unary)
 
 
-kernelForCoppertop = Kernel(Missing)
+kernelForCoppertop = BaseKernel(Missing)

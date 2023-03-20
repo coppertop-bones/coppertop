@@ -35,8 +35,10 @@ from bones import jones
 
 
 # rejected ideas:
-# 1) from groot import dm - creates dm if it doesn't exist  - can't distinguish between new module and misspelt thing
+# 1) from groot import dm - creates dm if it doesn't exist  - can't distinguish between a new module and a misspelt one
 # 2) `import dm` or `from fred import dm` always return bones module if it is defined - messing with python imports
+#
+# unusally we have a __init__ file so that the importer is included even if you just do import coppertop
 
 
 if '_oldImportFnForCoppertop' not in sys.__dict__:

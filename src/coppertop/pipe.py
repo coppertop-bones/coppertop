@@ -40,12 +40,13 @@ __all__ = [
 import inspect, types, datetime, builtins, time
 from collections import namedtuple
 
+import coppertop._groot
 from bones import jones
 
 # note: bones modules live in sys._bmodules which is created by coppertop/__init__.py
 
 from bones.core.context import context
-from coppertop import BModule
+from coppertop._groot import BModule
 from coppertop._scopes import _CoWProxy, _UNDERSCORE
 from bones.core.errors import ProgrammerError, ErrSite, CPTBError
 from bones.core.sentinels import Missing, function
