@@ -13,7 +13,7 @@ version = bones.meta.version
 
 
 setup(
-  name='coppertop-bones',
+  name='coppertop',
   packages=[
     'bones',
     'bones.c',
