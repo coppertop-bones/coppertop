@@ -1,9 +1,9 @@
-## coppertop-bones - partial functions, multiple-dispatch and pipeline style for Python
+## coppertop - multiple-dispatch, partial functions and pipeline style for Python
 
 Coppertop provides an alternative programming experience in Python via the following:
 
-* partial (application of) functions
 * multiple-dispatch
+* partial functions
 * piping syntax
 * an embryonic [core library](https://github.com/coppertop-bones/dm/tree/main/src/dm) of common functions
 
@@ -12,41 +12,20 @@ Coppertop provides an alternative programming experience in Python via the follo
 
 ### Installation
 
-`pip install coppertop-std` for the dangermouse core library and the @coppertop decorator.\
-`pip install coppertop-bones` just for the @coppertop decorator.
+`pip install coppertop-bones-dm` for the dm core library and the @coppertop decorator.\
+`pip install coppertop` just for the @coppertop decorator.
 
 
 <br>
 
-### Partial (application of) functions
+### Multiple-dispatch
 
-By decorating a function with @coppertop (and importing _) we can create partial functions, for example:
-
-syntax: `f(_, a)` -> `f(_)`  \
-where `_` is used as a sentinel place-holder for arguments yet to be confirmed (TBC)
+To use multiple-dispatch decorate functions with @coppertop and use different type annotations. Missing annotations 
+are taken as fallback wildcards. Class inheritance is ignored when matching caller and function signatures.
 
 ```
 from coppertop.pipe import *
 
-@coppertop
-def appendStr(x, y):
-    assert isinstance(x, str) and isinstance(y, str)
-    return x + y
-
-appendWorld = appendStr(_, " world!")
-
-assert appendWorld("hello") == "hello world!"
-```
-
-<br>
-
-
-### Multiple-dispatch
-
-To use the multi-dispatch redefine functions but with different type annotations. Missing annotations are taken as 
-fallback wildcards. Class inheritance is ignored when matching caller and function signatures.
-
-```
 @coppertop
 def addOne(x:int) -> int:
     return x + 1
@@ -70,11 +49,32 @@ assert addOne([0]) == [0, 1]
 <br>
 
 
+### Partial (application of) functions
+
+syntax: `f(_, a)` -> `f(_)`  \
+where `_` is used as a sentinel place-holder for arguments yet to be confirmed (TBC)
+
+We create partials of @coppertop decorated functions when we use _ indicating deferred arguments. For example:
+
+```
+@coppertop
+def appendStr(x, y):
+    assert isinstance(x, str) and isinstance(y, str)
+    return x + y
+
+appendWorld = appendStr(_, " world!")           # first argument is deferred
+
+assert appendWorld("hello") == "hello world!"
+```
+
+<br>
+
+
 ### Piping syntax
 
 The @coppertop function decorator also extends functions with the `>>` operator
 and so allows code to be written in a more essay style format - i.e. left-to-right and 
-top-to-bottom. The idea is to make it easier to express the syntax (aka sequence) of a solution.
+top-to-bottom. The idea is to make it easier to express program syntax (aka sequence).
 
 
 <br>
@@ -144,8 +144,8 @@ actual >> check >> equal >> [4, 6]
 
 ### Example - Cluedo notepad
 
-See [algos.py](https://github.com/DangerMouseB/coppertop-bones-demo/blob/main/src/dm/examples/cluedo/algos.py), where 
-we track a game of Cluedo and infer who did it. See [games.py](https://github.com/DangerMouseB/coppertop-bones-demo/blob/main/src/dm/examples/cluedo/games.py) 
+See [algos.py](https://github.com/coppertop-bones/dm/blob/main/examples/dm/examples/cluedo/algos.py), where 
+we track a game of Cluedo and infer who did it. See [games.py](https://github.com/coppertop-bones/dm/blob/main/examples/dm/examples/cluedo/ex_games.py) 
 for example game input.
 
 <br>
