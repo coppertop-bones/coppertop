@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 from distutils.core import Extension
-import bones.meta
+import coppertop.pipe
 
 # read the contents of README.md file
 from os import path
@@ -8,13 +8,13 @@ this_directory = path.abspath(path.dirname(__file__))
 with open(path.join(this_directory, '..', 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
-version = bones.meta.version
+version = coppertop.__version__
 
 # print(find_packages())
 # https://stackoverflow.com/questions/27281785/python-setup-py-how-to-set-the-path-for-the-generated-so
 
 setup(
-  name='coppertop-bones',
+  name='coppertop',
   packages=[
     'bones',
     'bones.c',
@@ -31,16 +31,16 @@ setup(
   # namespace_packages=['coppertop_'],
   version=version,
   python_requires='>=3.9',
-  license='BSD',
-  description = 'Partial functions, multi-dispatch and pipeline style for Python',
+  license='Apache',
+  description = 'Multiple-dispatch, partial functions and pipeline operator for Python',
   long_description_content_type='text/markdown',
   long_description=long_description,
   author = 'David Briant',
   author_email = 'dangermouseb@forwarding.cc',
-  url = 'https://github.com/coppertop-bones/coppertop-bones',
+  url = 'https://github.com/coppertop-bones/coppertop',
   download_url = '',
-  # download_url = f'https://github.com/DangerMouseB/coppertop-bones/archive/{version}.tar.gz',
-  keywords = ['piping', 'pipeline', 'pipe', 'functional'],
+  keywords = ['multiple', 'dispatch', 'piping', 'pipeline', 'pipe', 'functional', 'multimethods', 'multidispatch',
+    'functools', 'lambda', 'curry', 'currying'],
   install_requires=['numpy >= 1.17.3'],
   include_package_data=True,
   classifiers=[

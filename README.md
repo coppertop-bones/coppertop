@@ -145,7 +145,7 @@ actual >> check >> equal >> [4, 6]
 ### Example - Cluedo notepad
 
 See [algos.py](https://github.com/coppertop-bones/dm/blob/main/examples/dm/examples/cluedo/algos.py), where 
-we track a game of Cluedo and infer who did it. See [games.py](https://github.com/coppertop-bones/dm/blob/main/examples/dm/examples/cluedo/ex_games.py) 
+we track a game of Cluedo and infer who did it. See [ex_games.py](https://github.com/coppertop-bones/dm/blob/main/examples/dm/examples/cluedo/ex_games.py) 
 for example game input.
 
 <br>

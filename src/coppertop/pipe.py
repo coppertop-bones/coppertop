@@ -25,6 +25,7 @@ import inspect, types, datetime, builtins, time
 from collections import namedtuple
 
 import coppertop._groot
+coppertop.__version__ = "2023.03.21.1"
 from bones import jones
 
 # note: bones modules live in sys._bmodules which is created by coppertop/__init__.py

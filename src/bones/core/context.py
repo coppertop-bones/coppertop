@@ -30,12 +30,8 @@ if not hasattr(sys, '_ContextStack'):
 class _Context(object):
 
     def __call__(self, *args, **kwargs):
-        if args:
-            if len(args) > 1: raise ProgrammerError(f'Can only get one context value at a time, but {args} was requested')
-            # get context
-
-        else:
-            return _setContext(**kwargs)
+        if args and len(args) > 1: raise ProgrammerError(f'Can only get one context value at a time, but {args} was requested')
+        return _setContext(**kwargs)
 
     def __getattr__(self, name):
         return sys._ContextStack.get(name, [Missing])[-1]

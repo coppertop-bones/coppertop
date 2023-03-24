@@ -73,7 +73,7 @@ class BonesHandler(object):
         if 'groups' in args: kwargs['showGroups'] = True
         if 'ast' in args: kwargs['showTc'] = True
         if 'types' in args: kwargs['showTypes'] = True
-        if 'norun' in args: kwargs['norun'] = True
+        if 'execute' in args: kwargs['execute'] = True
         try:
             with context(**kwargs):
                 res = self.bonesKernel.run(src)
