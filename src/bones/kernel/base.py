@@ -17,6 +17,7 @@ from bones.lang.types import unary
 # keep the contexts on the kernel to relieve the burden of type memory management from the storage manager
 
 class BaseKernel(object):
+    __slots__ = ['ctxs', 'sm', 'modByPath', 'styleByName']
     def __init__(self, sm):
         self.ctxs = {}
         self.sm = sm
