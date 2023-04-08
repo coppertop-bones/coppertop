@@ -145,11 +145,17 @@ PyMODINIT_FUNC PyInit_jones(void) {
         return NULL;
     }
 
-
     // add function classes
     if (PyType_Ready(&FnCls) < 0) return NULL;
     if (PyModule_AddObject(m, "_fn", (PyObject *) &FnCls) < 0) {
         Py_DECREF(&FnCls);
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    if (PyType_Ready(&PFnCls) < 0) return NULL;
+    if (PyModule_AddObject(m, "_pfn", (PyObject *) &PFnCls) < 0) {
+        Py_DECREF(&PFnCls);
         Py_DECREF(m);
         return NULL;
     }

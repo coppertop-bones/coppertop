@@ -99,8 +99,8 @@ static PyObject * _binary_nb_rshift(PyObject *, PyObject *);
 static PyObject * _pbinary_nb_rshift(PyObject *, PyObject *);
 static PyObject * _ternary_nb_rshift(PyObject *, PyObject *);
 static PyObject * _pternary_nb_rshift(PyObject *, PyObject *);
-static PyObject * _rau_nb_rshift(PyObject *, PyObject *);
-static PyObject * _prau_nb_rshift(PyObject *, PyObject *);
+//static PyObject * _rau_nb_rshift(PyObject *, PyObject *);
+//static PyObject * _prau_nb_rshift(PyObject *, PyObject *);
 
 
 
@@ -589,6 +589,21 @@ static PyObject * Partial_o_tbc(Partial *partial, void* closure) {
     return answer;
 }
 
+static PyObject * Partial_args(Partial *partial, void* closure) {
+    Py_ssize_t full_size = Py_SIZE(partial);  PyObject **args = partial->args;  PyObject * TBC = partial->Fn.TBCSentinel;
+    if (partial->pipe1 != NULL || partial->pipe2 != NULL) return NULL;
+    PyObject *answer = PyTuple_New(full_size);
+    if (answer == NULL) return NULL;
+    for (Py_ssize_t o=0; o < full_size; o++) {
+        if (args[o] == TBC)
+            PyTuple_SET_ITEM(answer, o, Py_None);
+        else
+            PyTuple_SET_ITEM(answer, o, args[o]);
+        Py_INCREF(args[o]);                         // PyTuple_SET_ITEM steals a reference so inc
+    }
+    return answer;
+}
+
 
 
 // __array_ufunc__ to work nicely with numpy
@@ -756,6 +771,7 @@ static PyMethodDef Fn_methods[] = {
 
 static PyGetSetDef Partial_getsetters[] = {
     {"o_tbc", (getter) Partial_o_tbc, NULL, "offsets of missing arguments", NULL},
+    {"args", (getter) Partial_args, NULL, "arguments thus far", NULL},
     {NULL}
 };
 
@@ -787,8 +803,8 @@ static PyNumberMethods _pbinary_tp_as_number = {.nb_rshift = (binaryfunc) _pbina
 
 static PyNumberMethods _ternary_tp_as_number = {.nb_rshift = (binaryfunc) _ternary_nb_rshift,};
 static PyNumberMethods _pternary_tp_as_number = {.nb_rshift = (binaryfunc) _pternary_nb_rshift,};
-static PyNumberMethods _rau_tp_as_number = {.nb_rshift = (binaryfunc) _rau_nb_rshift,};
-static PyNumberMethods _prau_tp_as_number = {.nb_rshift = (binaryfunc) _prau_nb_rshift,};
+//static PyNumberMethods _rau_tp_as_number = {.nb_rshift = (binaryfunc) _rau_nb_rshift,};
+//static PyNumberMethods _prau_tp_as_number = {.nb_rshift = (binaryfunc) _prau_nb_rshift,};
 
 
 
@@ -800,6 +816,16 @@ static PyTypeObject FnCls = {
     .tp_basicsize = sizeof(Base),
     .tp_itemsize = 0,
     .tp_doc = PyDoc_STR("_fn"),
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+};
+
+
+static PyTypeObject PFnCls = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "jones._pfn",
+    .tp_basicsize = sizeof(Base),
+    .tp_itemsize = 0,
+    .tp_doc = PyDoc_STR("_pfn"),
     .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
 };
 
@@ -824,7 +850,7 @@ static PyTypeObject NullaryCls = {
 
 static PyTypeObject PNullaryCls = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_base = &FnCls,
+    .tp_base = &PFnCls,
     .tp_name = "jones._pnullary",
     .tp_basicsize = sizeof(Partial),
     .tp_itemsize = sizeof(PyObject *),
@@ -858,7 +884,7 @@ static PyTypeObject UnaryCls = {
 
 static PyTypeObject PUnaryCls = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_base = &FnCls,
+    .tp_base = &PFnCls,
     .tp_name = "jones._punary",
     .tp_basicsize = sizeof(Partial),
     .tp_itemsize = sizeof(PyObject *),
@@ -892,7 +918,7 @@ static PyTypeObject BinaryCls = {
 
 static PyTypeObject PBinaryCls = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_base = &FnCls,
+    .tp_base = &PFnCls,
     .tp_name = "jones._pbinary",
     .tp_basicsize = sizeof(Partial),
     .tp_itemsize = sizeof(PyObject *),
@@ -926,7 +952,7 @@ static PyTypeObject TernaryCls = {
 
 static PyTypeObject PTernaryCls = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_base = &FnCls,
+    .tp_base = &PFnCls,
     .tp_name = "jones._pternary",
     .tp_basicsize = sizeof(Partial),
     .tp_itemsize = sizeof(PyObject *),
@@ -940,38 +966,38 @@ static PyTypeObject PTernaryCls = {
 };
 
 
-static PyTypeObject RauCls = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_base = &FnCls,
-    .tp_name = "jones._rau",
-    .tp_basicsize = sizeof(Fn),
-    .tp_itemsize = 0,
-    .tp_doc = PyDoc_STR("_rau() - todo delegate to d"),
-    .tp_flags = Py_TPFLAGS_DEFAULT,
-    .tp_new = Fn_new,
-    .tp_init = (initproc) Fn_init,
-    .tp_dealloc = (destructor) Fn_dealloc,
-    .tp_members = Fn_members,
-    .tp_methods = Fn_methods,
-    .tp_getset = Fn_getsetters,
-    .tp_call = (ternaryfunc) _Fn__call__,
-    .tp_as_number = (PyNumberMethods*) &_rau_tp_as_number,
-};
-
-static PyTypeObject PRauCls = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_base = &FnCls,
-    .tp_name = "jones._prau",
-    .tp_basicsize = sizeof(Partial),
-    .tp_itemsize = sizeof(PyObject *),
-    .tp_flags = Py_TPFLAGS_DEFAULT,
-    .tp_dealloc = (destructor) Partial_dealloc,
-    .tp_members = Partial_members,
-    .tp_methods = Partial_methods,
-    .tp_getset = Partial_getsetters,
-    .tp_call = (ternaryfunc) _Partial__call__,
-    .tp_as_number = (PyNumberMethods*) &_prau_tp_as_number,
-};
+//static PyTypeObject RauCls = {
+//    PyVarObject_HEAD_INIT(NULL, 0)
+//    .tp_base = &FnCls,
+//    .tp_name = "jones._rau",
+//    .tp_basicsize = sizeof(Fn),
+//    .tp_itemsize = 0,
+//    .tp_doc = PyDoc_STR("_rau() - todo delegate to d"),
+//    .tp_flags = Py_TPFLAGS_DEFAULT,
+//    .tp_new = Fn_new,
+//    .tp_init = (initproc) Fn_init,
+//    .tp_dealloc = (destructor) Fn_dealloc,
+//    .tp_members = Fn_members,
+//    .tp_methods = Fn_methods,
+//    .tp_getset = Fn_getsetters,
+//    .tp_call = (ternaryfunc) _Fn__call__,
+//    .tp_as_number = (PyNumberMethods*) &_rau_tp_as_number,
+//};
+//
+//static PyTypeObject PRauCls = {
+//    PyVarObject_HEAD_INIT(NULL, 0)
+//    .tp_base = &FnCls,
+//    .tp_name = "jones._prau",
+//    .tp_basicsize = sizeof(Partial),
+//    .tp_itemsize = sizeof(PyObject *),
+//    .tp_flags = Py_TPFLAGS_DEFAULT,
+//    .tp_dealloc = (destructor) Partial_dealloc,
+//    .tp_members = Partial_members,
+//    .tp_methods = Partial_methods,
+//    .tp_getset = Partial_getsetters,
+//    .tp_call = (ternaryfunc) _Partial__call__,
+//    .tp_as_number = (PyNumberMethods*) &_prau_tp_as_number,
+//};
 
 
 
