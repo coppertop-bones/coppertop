@@ -16,8 +16,8 @@ import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 __all__ = [
-    'coppertop', 'nullary', 'unary', 'binary', 'ternary', '_', 'sig', 'context', 'typeOf', 'makeFn', 'GROOT_NS',
-    'fitsWithin', 'type', 'fitsWithin_'
+    'coppertop', 'nullary', 'unary', 'binary', 'ternary', '_', 'sig', 'context', 'typeOf', 'makeFn', 'GROOT',
+    'fitsWithin', 'type', 'fitsWithin_', 'SCRATCH'
 ]
 
 
@@ -63,8 +63,8 @@ _ = _UNDERSCORE
 MANDATORY = inspect._empty    # this is the sentinel python uses to indicate that an argument has no default (i.e. is optional)
 NO_ANNOTATION = inspect._empty    # this is the sentinel python uses to indicate that an argument has no annotation
 BETTER_ERRORS = False
-DEFAULT_NS = 'scratch'
-GROOT_NS = ''
+SCRATCH = 'scratch'
+GROOT = ''
 ANON_NAME = '<lambda>'
 
 _SCTracker = []
@@ -91,7 +91,7 @@ def makeFn(*args):
     bmodname, pymodname, fnname, priorMF, definedInFunction, argNames, sig, tRet, pass_tByT = _fnContext(pyfn, 'anon', name)
     if _t is Missing:
         _t = BTFn(BTTuple(*[py] * len(argNames)), py)
-    bmodname = DEFAULT_NS if bmodname is Missing else bmodname
+    bmodname = SCRATCH if bmodname is Missing else bmodname
     fn = _Function(
         name=fnname, bmodname=bmodname, pymodname=pymodname,
         style=unary, pyfn=pyfn, dispatchEvenIfAllTypes=False, typeHelper=Missing, _t=_t, argNames=argNames, pass_tByT=False
@@ -124,7 +124,7 @@ def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEv
                 else:
                     bmodname = priorMF.d.bmodname
             else:
-                bmodname = DEFAULT_NS
+                bmodname = SCRATCH
 
         # create dispatcher
         fn = _Function(fnname, bmodname, pymodname, style_, pyfn, dispatchEvenIfAllTypes, typeHelper, BTFn(sig, tRet), argNames, pass_tByT)
@@ -149,7 +149,7 @@ def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEv
                 if bmodule is Missing:
                     bmodule = BModule(bmodname)
                     sys._bmodules[bmodname] = bmodule
-                    if bmodname != GROOT_NS:
+                    if bmodname != GROOT:
                         splits = bmodname.split('.')
                         parentname = ''
                         for subname in splits:
@@ -203,9 +203,9 @@ def _fnContext(pyfn, callerFnName, name=Missing):
         priorMF = frame.f_globals.get(fnname, Missing)
     if not isinstance(priorMF, jones._fn):
         priorMF = Missing
-    bmodname = frame.f_locals.get('BONES_NS', Missing)
+    bmodname = frame.f_locals.get('MODULE_NS', Missing)
     if bmodname is Missing:
-        bmodname = frame.f_globals.get('BONES_NS', Missing)
+        bmodname = frame.f_globals.get('MODULE_NS', Missing)
     # fi_debug = inspect.getframeinfo(frame, context=0)
     pymodname = frame.f_globals.get('__name__', Missing)
     globals__package__ = frame.f_globals.get('__package__', Missing)
@@ -529,11 +529,11 @@ def _type(x):
     return builtins.type(x)
 
 # public functions
-typeOf = coppertop(name='typeOf', dispatchEvenIfAllTypes=True, module=GROOT_NS)(_typeOf)
-sig = coppertop(name='sig', module=GROOT_NS)(_sig)
-fitsWithin = coppertop(name='fitsWithin', style=binary, dispatchEvenIfAllTypes=True, module=GROOT_NS)(_fitsWithin)
-fitsWithin_ = coppertop(name='fitsWithin_', style=binary, dispatchEvenIfAllTypes=True, module=GROOT_NS)(_fitsWithin_)
-type = coppertop(name='type', dispatchEvenIfAllTypes=True, module=GROOT_NS)(_type)
+typeOf = coppertop(name='typeOf', dispatchEvenIfAllTypes=True, module=GROOT)(_typeOf)
+sig = coppertop(name='sig', module=GROOT)(_sig)
+fitsWithin = coppertop(name='fitsWithin', style=binary, dispatchEvenIfAllTypes=True, module=GROOT)(_fitsWithin)
+fitsWithin_ = coppertop(name='fitsWithin_', style=binary, dispatchEvenIfAllTypes=True, module=GROOT)(_fitsWithin_)
+type = coppertop(name='type', dispatchEvenIfAllTypes=True, module=GROOT)(_type)
 
 
 
