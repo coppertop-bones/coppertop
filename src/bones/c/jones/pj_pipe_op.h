@@ -460,13 +460,13 @@ static PyObject * _pternary_nb_rshift(PyObject *lhs, PyObject *rhs) {
 // rau pipe dispatch
 //
 
-static PyObject * _rau_nb_rshift(PyObject *lhs, PyObject *rhs) {
-    return PyErr_Format(NotYetImplemented, "arg >> _rau encountered");
-}
-
-static PyObject * _prau_nb_rshift(PyObject *lhs, PyObject *rhs) {
-    return PyErr_Format(NotYetImplemented, "arg >> _prau encountered");
-}
+//static PyObject * _rau_nb_rshift(PyObject *lhs, PyObject *rhs) {
+//    return PyErr_Format(NotYetImplemented, "arg >> _rau encountered");
+//}
+//
+//static PyObject * _prau_nb_rshift(PyObject *lhs, PyObject *rhs) {
+//    return PyErr_Format(NotYetImplemented, "arg >> _prau encountered");
+//}
 
 
 

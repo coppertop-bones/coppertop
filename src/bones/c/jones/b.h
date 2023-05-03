@@ -21,16 +21,17 @@
 typedef ju16 TypeNum;
 #define TN_NULL 0x0000
 
-// TypeNumber encoding
+// signature encoding
 typedef ju16 TN1;          // bit 15 - hasUpper, bit 14 - isPointer, bit 13-0 are the first 16k types
-typedef ju16 TN2;          // bits 12-8 reserved for sig cache payload, bits 7-0 make total up to 4M types
+typedef ju16 TN2;          // bits 15-4 reserved for sig cache payload, bits 2-0 make total up to 128k types
 typedef ju16 SigHeader;    // bits 15-5 reserved, bits 4-0 size in bytes (can handle up to 16 TN2 arguments)
 
 
 
 // symbol encoding
 // size prefixed, utf8 sequence, from 0 to 255 bytes so 0 is effectively the null symbol - we "waste" one byte for
-// null termination so standard c string functions can work - size prefix allows for slightly faster comparison
+// null termination so standard c string functions can work - size prefix allows for slightly faster comparison as
+// we check size first
 
 
 // 0x0000_FFFF_FFFF_FFFF

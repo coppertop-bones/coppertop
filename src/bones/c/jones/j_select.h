@@ -19,16 +19,51 @@
 
 // we only keep hits in the cache as cache misses mean "not found" which initiates a fitsWithin search, and then either
 // a type error is raised or the new hit is added to the cache
+// we want to count the number of hits so we can sort according to hits -> which hopefully will be faster overall
 
-
-// we have at least 48 bits in a signature howevere we only can rely on there being space in the first and last short
+// assuming that L1 & L2 cache misses are important for the dispatch we compact the signatures
+// a type can be TN1 or TN2 so the number of slots is 1 byte for header + 2 * num_args - TN1 is 1 short, TN2 is 2 shorts
+// we have 48 bits in a 1 arg signature however we only can rely on there being space in the first and last short
 // so we have 32 bits to play with
-// size prefix - 5 bits - allowing 16 32 bit types to 31 16 bit types + payload short
-// upper_payload - 11 bits - 2048
-// leaving 16 bits to divide three ways between payload, type count and hit count
-// hit count - 8 bits - 256 calls per notch - could then store notches in a buffer and call back on full
-// payload - 5 bits - total 16 - 64k - query signatures
-// type count - 3 bits - total 17 - 128k - types
+
+
+// SHORT (16-bit) ALIGNED
+// |         TN2          |           TN1            |      Sig Header     |
+// | PPPPP HHH HHHH H TTT | TN2 Po TT TTTT TTTT TTTT | PPPP PPPP PPP NNNNN |
+//
+// N -> max size of sig in multiples of SHORT -> 5 bits up to 32 shorts (16 args without winging it)
+// P -> payload (i.e. the function slot for this overload)
+// T -> type (17 bits -> 128k types)
+// Po -> is pointer (1 bit)
+// TN2 -> is TN2 type
+// H -> hit count (8 bits -> 256 hot hits before incrementing cold hit)
+
+
+//pointers
+//| ---- ---- PPPP PPPP | PPPP PPPP PPPP P--- |
+//
+//11 spare bits
+//
+//IEEE Doubles - NaN boxing - 52 spare bits
+//
+//S[Exponent-][Mantissa------------------------------------------]
+//| SEEE EEEE EEEE MMMM | MMMM MMMM MMMM MMMM | MMMM MMMM MMMM MMMM | MMMM MMMM MMMM MMMM |
+//| S111 1111 1111 0000 | 0000 0000 0000 0000 | 0000 0000 0000 0000 | 0000 0000 0000 0000 |   +- infinity
+//| -111 1111 1111 1--- | ---- ---- ---- ---- | ---- ---- ---- ---- | ---- ---- ---- ---- |   non-signalling NaN
+//| -111 1111 1111 0--- | ---- ---- ---- ---- | ---- ---- ---- ---- | ---- ---- ---- ---- |   signalling NaN but mantissa > 0
+//
+//if double + pStr - 7 spare bits
+//
+//any struct > 2 things is going to be a pointer - so no real overhead in a 64bit box?
+//symbols
+//unboxed types
+//symbols (length prefixed utf8), strings (utf8), numbers u8, i8, u64, i64, f64, bool, small structs
+//
+//stack
+//scratch
+//heap objects - prefix with a 32 bit meta field (which includes the type) - this  might get padded to 64bits for
+//    doubles? or we can align the payload?, e.g. to cache lines or possibly set lines?
+
 
 
 #define MAX_NUM_T1_TYPES _16K
