@@ -26,7 +26,7 @@ setup(
     'bones.lang',
     'coppertop',
   ],
-  ext_modules=[Extension("bones.jones", ["./bones/c/jones/__jones.c"])],
+  ext_modules=[Extension("bones.jones", ["../bk/src/jones/__jones.c"])],
   # package_dir = {'': 'core'},
   # namespace_packages=['coppertop_'],
   version=version,
