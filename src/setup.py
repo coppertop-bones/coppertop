@@ -1,6 +1,5 @@
 from setuptools import setup, find_packages
 from distutils.core import Extension
-import coppertop.pipe
 
 # read the contents of README.md file
 from os import path
@@ -8,7 +7,7 @@ this_directory = path.abspath(path.dirname(__file__))
 with open(path.join(this_directory, '..', 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
-version = coppertop.__version__
+version = '2023.08.18.1'
 
 # print(find_packages())
 # https://stackoverflow.com/questions/27281785/python-setup-py-how-to-set-the-path-for-the-generated-so
@@ -26,7 +25,7 @@ setup(
     'bones.lang',
     'coppertop',
   ],
-  ext_modules=[Extension("bones.jones", ["../bk/src/jones/__jones.c"])],
+  ext_modules=[Extension("bones.jones", ["./bk_local/src/jones/__jones.c"])],
   # package_dir = {'': 'core'},
   # namespace_packages=['coppertop_'],
   version=version,

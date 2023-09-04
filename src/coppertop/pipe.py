@@ -487,10 +487,9 @@ def _typeOf(x):
     if hasattr(x, '_t'):
         return x._t                     # it's a tv of some sort so return the t
     elif isinstance(x, jones._fn):
-        if x.__class__ in (jones._nullary, jones._unary, jones._binary, jones._ternary):
-            return x.d._t
-        else:
-            return x.d._tPartial(x.num_args, x.o_tbc)
+        return x.d._t
+    elif isinstance(x, jones._pfn):
+        return x.d._tPartial(x.num_args, x.o_tbc)
     else:
         t = builtins.type(x)
         if t is _CoWProxy:
