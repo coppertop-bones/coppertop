@@ -1,10 +1,11 @@
+import os
 from setuptools import setup, find_packages
 from distutils.core import Extension
 
+parent_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
 # read the contents of README.md file
-from os import path
-this_directory = path.abspath(path.dirname(__file__))
-with open(path.join(this_directory, '..', 'README.md'), encoding='utf-8') as f:
+with open(os.path.join(parent_folder, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 version = '2023.08.18.1'
@@ -25,7 +26,7 @@ setup(
     'bones.lang',
     'coppertop',
   ],
-  ext_modules=[Extension("bones.jones", ["./bk_local/src/jones/__jones.c"])],
+  ext_modules=[Extension("bones.jones", [os.path.join(parent_folder, "bk/src/jones/__jones.c")])],
   # package_dir = {'': 'core'},
   # namespace_packages=['coppertop_'],
   version=version,
@@ -49,7 +50,6 @@ setup(
     'Intended Audience :: Science/Research',
     'Topic :: Utilities',
     'License :: OSI Approved :: BSD License',
-    'Programming Language :: Python :: 3.8',
     'Programming Language :: Python :: 3.9',
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
