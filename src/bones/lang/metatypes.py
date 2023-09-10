@@ -75,7 +75,7 @@ class BType(BTypeRoot):
     
     _arrayOrdinalTypes = ()
 
-    __slots__ = ['id', 'name', 'hasT', 'familial', 'explicit', 'orthogonal', '_constructor', '_coercer', '_pp']
+    __slots__ = ['name', 'hasT', 'familial', 'explicit', 'orthogonal', '_constructor', '_coercer', '_pp']
 
     # TYPE CONSTRUCTION & NAMING
 
@@ -84,7 +84,6 @@ class BType(BTypeRoot):
         assert cls is not BType
         id = next(_idSeed)
         instance = super().__new__(cls)
-        instance.TN1 = id
         instance.id = id
         instance.name = Missing
         instance.hasT = False
