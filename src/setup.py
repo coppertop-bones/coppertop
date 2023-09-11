@@ -1,5 +1,5 @@
 import os
-from setuptools import setup, find_packages
+from setuptools import setup
 from distutils.core import Extension
 
 parent_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -10,16 +10,13 @@ with open(os.path.join(parent_folder, 'README.md'), encoding='utf-8') as f:
 
 version = '2023.08.18.1'
 
-# print(find_packages())
-# https://stackoverflow.com/questions/27281785/python-setup-py-how-to-set-the-path-for-the-generated-so
-
 setup(
   name='coppertop',
   packages=[
     'bones',
-    'bones.c',
-    'bones.c.jones',
-    'bones.c.jones.other',
+    # 'bones.c',
+    # 'bones.c.jones',
+    # 'bones.c.jones.other',
     'bones.core',
     'bones.ipykernel',
     'bones.kernel',
@@ -44,7 +41,7 @@ setup(
   install_requires=['numpy >= 1.17.3'],
   include_package_data=True,
   classifiers=[
-    'Development Status :: 4 - Beta',      # Chose either "3 - Alpha", "4 - Beta" or "5 - Production/Stable" as the current state of your package
+    'Development Status :: 3 - Alpha',      # Chose either "3 - Alpha", "4 - Beta" or "5 - Production/Stable" as the current state of your package
     'Intended Audience :: Developers',
     'Intended Audience :: End Users/Desktop',
     'Intended Audience :: Science/Research',
@@ -56,6 +53,3 @@ setup(
   ],
   zip_safe=False,
 )
-
-# https://autopilot-docs.readthedocs.io/en/latest/license_list.html
-# https://pypi.org/classifiers/

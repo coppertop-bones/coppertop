@@ -390,11 +390,11 @@ class _Dispatcher(object):
                 tArgs = jones.sc_tArgsFromQuery(pSC, _BTypeById)
                 fn, tByT = _selectFunction(tArgs, self.fnBySigByNumArgs[numArgs], self.name, self.fnBySigByNumArgs)
                 results.append((fn, tByT))
-                pQuery = jones.scQueryPtr(pSC)
-                iNext = jones.scNextFreeArrayIndex(pSC)
+                pQuery = jones.sc_queryPtr(pSC)
+                iNext = jones.sc_nextFreeArrayIndex(pSC)
                 if iNext == 0:
                     raise RuntimeError("Array not big enough")
-                jones.scAtArrayPut(pSC, iNext, pQuery, len(results))
+                jones.sc_atArrayPut(pSC, iNext, pQuery, len(results))
                 # searchTime += time.perf_counter_ns() - t3; dispatchTime += t3 - t1
             else:
                 # hitTime1 += t2 - t1; hitTime2 += t3 - t2; hits += 1; dispatchTime += t3 - t1
