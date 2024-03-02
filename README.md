@@ -105,7 +105,7 @@ syntax: `A >> f(args) >> B` -> `f(args)(A, B)`
 ```
 from bones.core.errors import NotYetImplemented
 import dm.core
-from groot import collect, inject
+from _ import collect, inject
 
 @coppertop(style=binary)
 def add(x, y):
@@ -132,7 +132,7 @@ def op(x, action, y):
 syntax: `A >> f(args) >> B >> C` -> `f(args)(A, B, C)`
 
 ```
-from groot import both, check, equals
+from _ import both, check, equals
 
 actual = [1,2] >> both >> (lambda x, y: x + y) >> [3,4]
 assert (1 >> equal >> 1) == True
@@ -156,7 +156,7 @@ for example game input.
 (both, collect, inject, addOne, appendStr, check, equals are all illustrated above)
 
 ```
-from groot import to
+from _ import to
 [1,2] >> both >> (lambda x, y: x + y) >> [3,4] 
    >> collect >> (lambda x: x * 2)
    >> inject(_,1,_) >> (lambda x,y: x * y)

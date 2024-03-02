@@ -74,7 +74,7 @@ def _selectFunction(callerSig, fnBySig, nameForError, fnBySigByNumArgsForError):
             caller = f'{nameForError}({",".join([repr(e) for e in callerSig])})'
             print(f'1. {caller} fitsWithin:', file=sys.stderr)
             for fn, tByT, distance, argDistances in matches:
-                callee = f'{fn.name}({",".join([repr(argT) for argT in fn.sig])}) (argDistances: {argDistances}) defined in {fn.bmodname}<{fn.pymodname}>'
+                callee = f'{fn.name}({",".join([repr(argT) for argT in fn.sig])}) (argDistances: {argDistances}) defined in {fn.modname}<{fn.pymodname}>'
                 print(f'  {callee}', file=sys.stderr)
             raiseLess(TypeError(f'Found {len(matches)} matches and {len(fallbacks)} fallbacks for {caller}', ErrSite("#2")))
     elif len(fallbacks) > 0:
@@ -96,7 +96,7 @@ def _selectFunction(callerSig, fnBySig, nameForError, fnBySigByNumArgsForError):
         #     with context(showFullType=True):
         #         lines = [
         #             f"Can't find {_ppFn(sd.name, callerSig)} ({len(callerSig)} args) in:",
-        #             f'  {_ppFn(sd.name, sd.sig, sd._argNames)} ({len(sd.sig)} args) in {sd.bmodname} - {sd.pymodname}'
+        #             f'  {_ppFn(sd.name, sd.sig, sd._argNames)} ({len(sd.sig)} args) in {sd.modname} - {sd.pymodname}'
         #         ]
         #         print('\n'.join(lines), file=sys.stderr)
         #         raiseLess(TypeError('\n'.join(lines), ErrSite("#1")))
@@ -112,7 +112,7 @@ def _cantFindMatchError(sig, nameForError, fnBySigByNumArgsForError):
         context.EE(f"Can't find {_ppFn(nameForError, sig)} in:")
         for fnBySig in fnBySigByNumArgsForError:
             for fnSig, fn in fnBySig.items():
-                context.EE(f'  {_ppFn(fn.name, fnSig)} in {fn.bmodname} - {fn.fullname}')
+                context.EE(f'  {_ppFn(fn.name, fnSig)} in {fn.modname} - {fn.fullname}')
 
     return TypeError(f"Can't find {_ppFn(nameForError, sig)}")
 
