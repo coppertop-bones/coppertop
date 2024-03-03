@@ -7,14 +7,19 @@ Coppertop provides an alternative programming experience in Python via the follo
 * piping syntax
 * an embryonic [core library](https://github.com/coppertop-bones/dm/tree/main/src/dm) of common functions
 
+https://github.com/coppertop-bones/dm
+
+
 <br>
 
 
 ### Installation
 
+OUT-OF-ORDER\
 `pip install coppertop-bones-dm` for the dm core library and the @coppertop decorator.\
 `pip install coppertop` just for the @coppertop decorator.
 
+At the moment needs to be git cloned and the setup.py manually run.
 
 <br>
 
@@ -57,6 +62,8 @@ where `_` is used as a sentinel place-holder for arguments yet to be confirmed (
 We create partials of @coppertop decorated functions when we use _ indicating deferred arguments. For example:
 
 ```
+from coppertop.pipe import *
+
 @coppertop
 def appendStr(x, y):
     assert isinstance(x, str) and isinstance(y, str)
@@ -104,8 +111,7 @@ syntax: `A >> f(args) >> B` -> `f(args)(A, B)`
 
 ```
 from bones.core.errors import NotYetImplemented
-import dm.core
-from _ import collect, inject
+from dm.core import collect, inject
 
 @coppertop(style=binary)
 def add(x, y):
@@ -132,7 +138,8 @@ def op(x, action, y):
 syntax: `A >> f(args) >> B >> C` -> `f(args)(A, B, C)`
 
 ```
-from _ import both, check, equals
+from dm.core import both
+from dm.testing immport check, equals
 
 actual = [1,2] >> both >> (lambda x, y: x + y) >> [3,4]
 assert (1 >> equal >> 1) == True
@@ -156,7 +163,7 @@ for example game input.
 (both, collect, inject, addOne, appendStr, check, equals are all illustrated above)
 
 ```
-from _ import to
+from dm.core import to
 [1,2] >> both >> (lambda x, y: x + y) >> [3,4] 
    >> collect >> (lambda x: x * 2)
    >> inject(_,1,_) >> (lambda x,y: x * y)

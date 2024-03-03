@@ -341,7 +341,6 @@ def _fnContext(pyfn, callerFnName, name):
                     )
     return modname, _getBModuleForName('_.' + modname), _getBModuleForName('_'), fnname, priorX, enclosingFnName, argNames, sig, tRet, pass_tByT
 
-
 def _tArgFromAnnotation(annotation, modname, fnname, msg):
     if isinstance(annotation, BType):
         return annotation
@@ -376,8 +375,7 @@ class _Function(object):
      ]
 
     def __init__(self, name, modname, style, pyfn, dispatchEvenIfAllTypes, typeHelper, _t, argNames, pass_tByT):
-        if not isinstance(_t, BTFn):
-            raise TypeError('_t is not a BTFn')
+        if not isinstance(_t, BTFn): raise TypeError('_t is not a BTFn')
         self.name = name
         self.modname = modname
         self.style = style
@@ -468,6 +466,8 @@ class _Dispatcher(object):
             hasValue = True
         else:
             # ensure we have a cache
+            if numArgs > len(self.cacheByNumArgs) - 1:
+                raise TypeError(f"Too many args passed to  {self.name} - max {len(self.cacheByNumArgs) - 1}, passed {numArgs}")
             if (cache := self.cacheByNumArgs[numArgs]) is Missing:
                 pSC = jones.sc_new(numArgs, 100)
                 cache = self.cacheByNumArgs[numArgs] = (pSC, [])
@@ -613,13 +613,16 @@ def _fitsWithin(a, b):
     doesFit, tByT, distances = cacheAndUpdate(origFitsWithin(a, b), {})
     return doesFit
 
+
 def _fitsWithin_(a, b):
     x = origFitsWithin(a, b)
     cacheAndUpdate(x, {})
     return x
 
+
 def _type(x):
     return builtins.type(x)
+
 
 # The coppertop.pipe import hook
 #
@@ -708,9 +711,6 @@ if '_oldImportFnForCoppertop' not in sys.__dict__:
                 tobmod = sys._bmodules.get(tobmodname, Missing)
             return _importFromBonesModule(name, frombmod, tobmodname, tobmod, globals, namesToImport)
         else:
-            if name.startswith('dm.core'):
-                print(f"{globals['__name__'].ljust(40)}: name: {name}, len(locals): {len(locals) if locals else 0}, fromList: {fromlist}, level: {level}")
-                a = 1
             mod = sys._oldImportFnForCoppertop(name, globals, locals, fromlist, level)
             return mod
 
