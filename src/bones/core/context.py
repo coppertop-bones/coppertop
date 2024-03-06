@@ -59,12 +59,12 @@ def _setContext(*args, **kwargs):
 context = _Context()
 
 def _PP(x):
-    print(x)
-    return(x)
+    print(str(x))
+    return x
 
 def _EE(x):
-    print(x, file = sys.stderr)
-    return(x)
+    print(str(x), file = sys.stderr)
+    return x
 
 sys._ContextStack.setdefault('PP', []).append(_PP)
 sys._ContextStack.setdefault('NB', []).append(_EE)

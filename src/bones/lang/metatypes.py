@@ -371,12 +371,13 @@ class BType(BTypeRoot):
         return self.__repr__()
 
     def ppName(self):
-        if not context.showFullType:
+        if context.showFullType:
+            return Missing
+        else:
             if a := self._pp:
                 return a, False, False
             elif a := self.name:
                 return a, False, False
-        return Missing
 
     def ppT(self):
         if a := self.ppName(): return a
