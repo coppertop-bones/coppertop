@@ -415,30 +415,25 @@ class _Dispatcher(object):
         style = dispatchers[0].style
         ds = []
         maxNumArgs = 0
-        for d in dispatchers:
-            if isinstance(d, _Dispatcher):
-                if len(d.fnBySigByNumArgs) > maxNumArgs: maxNumArgs = len(d.fnBySigByNumArgs) - 1  # don't forget 0 args
-            elif isinstance(d, _Function):
-                if len(d.sig) > maxNumArgs: maxNumArgs = len(d.sig)
-        fnBySigByNumArgs = [{} for i in range(maxNumArgs + 1)]
+
         for d in dispatchers:
             if isinstance(d, _Dispatcher):
                 for fnBySig in d.fnBySigByNumArgs:
-                    for d in fnBySig.values():
-                        if isinstance(d, _Function):
-                            if d.style != style:
-                                raiseLess(TypeError(f'Expected {style} got {d.style}', ErrSite(cls, "#4")))
-                            ds.append(d)
+                    for d2 in fnBySig.values():
+                        if isinstance(d2, _Function):
+                            cls._checkDispatcher(d2, name, style)
+                            ds.append(d2)
                         else:
-                            raiseLess(ValueError("unknown dispatcher type", ErrSite(cls, "#5")))
+                            raiseLess(ProgrammerError("unknown dispatcher class", ErrSite(cls, "#5")))
+                if len(d.fnBySigByNumArgs) > maxNumArgs: maxNumArgs = len(d.fnBySigByNumArgs) - 1  # don't forget 0 args
             elif isinstance(d, _Function):
-                if d.name != name:
-                    raise ProgrammerError(ErrSite(cls, "#9"))
-                if d.style != style:
-                    raiseLess(TypeError(f'When processing @coppertop for function {name} - expected style={style} got {d.style}', ErrSite(cls, "#10")))
+                cls._checkDispatcher(d, name, style)
+                if len(d.sig) > maxNumArgs: maxNumArgs = len(d.sig)
                 ds.append(d)
             else:
                 raiseLess(ProgrammerError("unhandled dispatcher class", ErrSite(cls, "#11")))
+
+        fnBySigByNumArgs = [{} for i in range(maxNumArgs + 1)]
         for d in ds:
             oldD = fnBySigByNumArgs[len(d.sig)].get(d.sig, Missing)
             # if oldD is not Missing and oldD.modname != d.modname:
@@ -457,6 +452,17 @@ class _Dispatcher(object):
         instance._t_ = Missing
         instance.__doc__ = None
         return instance
+
+    @classmethod
+    def _checkDispatcher(cls, d, name, style):
+        if d.name != name:
+            raiseLess(ProgrammerError(
+                f'Incompatible name - trying to overload function "{d.name}" with existing function "{name}"',
+                ErrSite(cls, "#1")))
+        if d.style != style:
+            raiseLess(ProgrammerError(
+                f'Incompatible style - tyring to overload {d.dtyle} function "{d.name}" with existing {style} function "{name}"',
+                ErrSite(cls, "#10")))
 
     def selectFn(self, args):
         numArgs = len(args)
