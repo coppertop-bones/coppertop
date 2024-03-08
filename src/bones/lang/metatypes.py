@@ -200,7 +200,7 @@ class BType(BTypeRoot):
             raise TypeError(f'{self} has a T so cannot be an instance type')
         if self._constructor:
             if args and isinstance(args[0], Constructors):
-                cs = args[0]
+                cs = Constructors(args[0])
                 cs.append(self)
                 return self._constructor(cs, *args[1:], **kwargs)
             else:

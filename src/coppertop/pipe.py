@@ -11,111 +11,8 @@
 #
 # **********************************************************************************************************************
 
-import sys
 
-if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
-
-__all__ = [
-    'coppertop', 'nullary', 'unary', 'binary', 'ternary', '_', 'sig', 'context', 'typeOf', 'makeFn',
-    'fitsWithin', 'type', 'fitsWithin_', 'SCRATCH'
-]
-
-
-import inspect, types, builtins
-from collections import namedtuple
-
-import coppertop
-coppertop.__version__ = "2023.03.21.1"
-from bones import jones
-
-# note: bones modules live in sys._bmodules
-
-from bones.core.context import context
-from coppertop._scopes import _CoWProxy, _UNDERSCORE
-from bones.core.errors import ProgrammerError, ErrSite, CPTBError, NotYetImplemented
-from bones.core.sentinels import Missing, function
-from bones.core.utils import firstKey, raiseLess
-from bones.lang.metatypes import BType, fitsWithin as origFitsWithin, cacheAndUpdate, BTFn, BTTuple, BTAtom, BTOverload, _BTypeById, _aliases
-from bones.lang.types import nullary, unary, binary, ternary, void, obj
-from bones.lang.select import _ppType, _selectFunction
-
-
-py = BTAtom.ensure("py").setOrthogonal(obj)
-
-if not hasattr(sys, '_CoppertopError'):
-    class CoppertopError(CPTBError): pass
-    sys._CoppertopError = CoppertopError
-    class CoppertopImportError(ImportError): pass
-    sys._CoppertopImportError = CoppertopImportError
-CoppertopError = sys._CoppertopError
-CoppertopImportError = sys._CoppertopImportError
-
-
-class BModule(types.ModuleType):
-    def __repr__(self):
-        return f'BModule({self.__name__})'
-
-    def __getattribute__(self, name):
-        try:
-            answer = super().__getattribute__(name)
-        except AttributeError as ex:
-            raise AttributeError(
-                f"bones module '{self.__name__}' has no attribute '{name}' - maybe it's defined in a python module "
-                f"that needs to be imported"
-            ) from None
-        return answer
-
-
-sys._bmodules = {'': BModule('')}
-
-
-
-hits = 0; misses = 0; hitTime1 = 0; hitTime2 = 0; missTime1 = 0; missTime2 = 0
-searchTime = 0 ;dispatchTime = 0; dispatchCount = 0; returnTime = 0; returnCount = 0
-
-
-_unhandledTypes = set()
-
-SelectionResult = namedtuple('SelectionResult', ['d', 'tByT'])
-
-_ = _UNDERSCORE
-MANDATORY = inspect._empty      # Python sentinel to indicate an argument has no default (i.e. is not optional)
-NO_ANNOTATION = inspect._empty  # Python sentinel to indicate an argument has no annotation
-BETTER_ERRORS = False
-SCRATCH = 'scratch'
-
-_SCTracker = []
-
-jonesFnByStyle = {
-    nullary: jones._nullary,
-    unary: jones._unary,
-    binary: jones._binary,
-    ternary: jones._ternary,
-}
-
-
-
-def makeFn(*args):
-    if len(args) == 1:
-        name, _t, pyfn = Missing, Missing, args[0]
-    elif len(args) == 2:
-        name, _t, pyfn = Missing, args[0], args[1]
-    elif len(args) == 3:
-        name, _t, pyfn = args[0], args[1], args[2]
-    else:
-        raise TypeError('Wrong number of args passed to partial', ErrSite("#1"))
-    modname, bmod, umod, fnname, priorPy, enclosingFnName, argNames, sig, tRet, pass_tByT = _fnContext(pyfn, 'anon', name)
-    if _t is Missing:
-        _t = BTFn(BTTuple(*[py] * len(argNames)), py)
-    fn = _Function(
-        name=fnname, modname=modname,
-        style=unary, pyfn=pyfn, dispatchEvenIfAllTypes=False, typeHelper=Missing, _t=_t, argNames=argNames, pass_tByT=False
-    )
-    d = _Dispatcher(fn)
-    return jones._unary(fnname, modname, d, _UNDERSCORE)
-
-
-
+# **********************************************************************************************************************
 # ## @coppertop and import semantics
 #
 # Overloads are not a global concept. They are created locally when two or more functions in a scope share the same
@@ -158,7 +55,88 @@ def makeFn(*args):
 # OPEN:
 # - overload count the type (including schema variables) and count the function and ideally count the module
 # - can bones see the Python uber fns? can a call from Python trigger a new function being built? TBC
+# **********************************************************************************************************************
 
+import sys
+
+if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
+
+__all__ = [
+    'coppertop', 'nullary', 'unary', 'binary', 'ternary', '_', 'sig', 'context', 'typeOf', 'makeFn',
+    'fitsWithin', 'type', 'fullFitsWithin', 'SCRATCH'
+]
+
+
+import inspect, types, builtins
+from collections import namedtuple
+
+import coppertop
+coppertop.__version__ = "2024.03.08.1"
+from bones import jones
+
+from bones.core.context import context
+from coppertop._scopes import _CoWProxy, _UNDERSCORE
+from bones.core.errors import ProgrammerError, ErrSite, CPTBError, NotYetImplemented
+from bones.core.sentinels import Missing, function
+from bones.core.utils import firstKey, raiseLess
+from bones.lang.metatypes import BType, fitsWithin as origFitsWithin, cacheAndUpdate, BTFn, BTTuple, BTAtom, BTOverload, _BTypeById, _aliases
+from bones.lang.types import nullary, unary, binary, ternary, void, obj
+from bones.lang.select import _ppType, _selectFunction
+
+
+py = BTAtom.ensure("py").setOrthogonal(obj)
+
+class CoppertopError(CPTBError): pass
+class CoppertopImportError(ImportError): pass
+
+class BModule(types.ModuleType):
+    def __repr__(self):
+        return f'BModule({self.__name__})'
+
+    def __getattribute__(self, name):
+        try:
+            answer = super().__getattribute__(name)
+        except AttributeError as ex:
+            raise AttributeError(
+                f"bones module '{self.__name__}' has no attribute '{name}' - maybe it's defined in a python module "
+                f"that needs to be imported"
+            ) from None
+        return answer
+
+# NOTE: bones modules live in sys._bmodules
+sys._bmodules = {'': BModule('')}
+
+
+# for profiling
+# hits = 0; misses = 0; hitTime1 = 0; hitTime2 = 0; missTime1 = 0; missTime2 = 0
+# searchTime = 0 ;dispatchTime = 0; dispatchCount = 0; returnTime = 0; returnCount = 0
+
+# OPEN: do we still need this?
+_unhandledTypes = set()
+
+SelectionResult = namedtuple('SelectionResult', ['d', 'tByT'])
+
+_ = _UNDERSCORE
+MANDATORY = inspect._empty      # Python sentinel to indicate an argument has no default (i.e. is not optional)
+NO_ANNOTATION = inspect._empty  # Python sentinel to indicate an argument has no annotation
+BETTER_ERRORS = False
+SCRATCH = 'scratch'
+
+# OPEN: do we still need this?
+_SCTracker = []
+
+jonesFnByStyle = {
+    nullary: jones._nullary,
+    unary: jones._unary,
+    binary: jones._binary,
+    ternary: jones._ternary,
+}
+
+
+
+# **********************************************************************************************************************
+# DECORATOR
+# **********************************************************************************************************************
 
 def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEvenIfAllTypes=False, local=False):
 
@@ -341,7 +319,7 @@ def _fnContext(pyfn, callerFnName, name):
                     )
     return modname, _getBModuleForName('_.' + modname), _getBModuleForName('_'), fnname, priorX, enclosingFnName, argNames, sig, tRet, pass_tByT
 
-def _tArgFromAnnotation(annotation, modname, fnname, msg):
+def _tArgFromAnnotation(annotation, modname, fnnameForErr, msgForErr):
     if isinstance(annotation, BType):
         return annotation
     elif annotation == NO_ANNOTATION:
@@ -353,19 +331,23 @@ def _tArgFromAnnotation(annotation, modname, fnname, msg):
             _aliases[annotation] = tArg
         return tArg
     elif annotation in _unhandledTypes:
-        raise TypeError(f'{modname}.{fnname} - {msg}{annotation}, use {_aliases[annotation]} instead', ErrSite("illegal argument type"))
+        raise TypeError(f'{modname}.{fnnameForErr} - {msgForErr}{annotation}, use {_aliases[annotation]} instead', ErrSite("illegal argument type"))
     elif isinstance(annotation, str):
         raise TypeError(
-            f'{modname}.{fnname} - {msg} str - has `from __future__ import annotations` been invoked in the module',
+            f'{modname}.{fnnameForErr} - {msgForErr} str - has `from __future__ import annotations` been invoked in the module',
             ErrSite("illegal argument type")
         )
     else:
         raise TypeError(
-            f'{modname}.{fnname} - {msg}{annotation}',
+            f'{modname}.{fnnameForErr} - {msgForErr}{annotation}',
             ErrSite("illegal argument type")
         )
 
 
+
+# **********************************************************************************************************************
+# Dispatch
+# **********************************************************************************************************************
 
 class _Function(object):
 
@@ -403,7 +385,6 @@ class _Function(object):
 
     def __repr__(self):
         return self.name
-
 
 
 class _Dispatcher(object):
@@ -597,43 +578,13 @@ def _typeOf(x):
         return _aliases.get(t, t)       # type python types as their bones equivalent
 
 
-def _sig(x):
-    if isinstance(x, function):
-        return f'{x.__name__} is a Python function'
-    x = x.d
-    if isinstance(x, _Dispatcher):
-        answer = []
-        for fnBySig in x.fnBySigByNumArgs:
-            for sig, d in fnBySig.items():
-                argTs = [_ppType(argT) for argT in sig]
-                retT = _ppType(d.tRet)
-                answer.append(f'({",".join(argTs)})->{retT} <{d.style.name}>  :   in {d.fullname}')
-        return answer
-    else:
-        argTs = [_ppType(argT) for argT in x.sig]
-        retT = _ppType(x.tRet)
-        return f'({",".join(argTs)})->{retT} <{x.style.name}>  :   in {x.fullname}'
 
+# **********************************************************************************************************************
+# IMPORT HOOK
+# **********************************************************************************************************************
 
-def _fitsWithin(a, b):
-    doesFit, tByT, distances = cacheAndUpdate(origFitsWithin(a, b), {})
-    return doesFit
-
-
-def _fitsWithin_(a, b):
-    x = origFitsWithin(a, b)
-    cacheAndUpdate(x, {})
-    return x
-
-
-def _type(x):
-    return builtins.type(x)
-
-
-# The coppertop.pipe import hook
-#
 # We wish to allow overloads to be created by importing jones functions into the same module. Normally Python overrides
-# prior exisiting names. For example if we do `from a import fred` followed by `from b import fred` the seond fred
+# prior exisiting names. For example if we do `from a import fred` followed by `from b import fred` the second fred
 # would replace the first `fred`. Instead we want to create an overload of the two `fred`s.
 #
 # To make our method standout in Python code we introduce the _ module, e.g. `from a import fred` followed by
@@ -691,44 +642,100 @@ def _importFromBonesModule(frombmodName, frombmod, tobmodname, tobmod, importers
     return newMod
 
 
-if '_oldImportFnForCoppertop' not in sys.__dict__:
-
-    sys._oldImportFnForCoppertop = builtins.__import__
-
-    def _newImport(name, globals=None, locals=None, fromlist=(), level=0):
-        if (splits := name.split('.', maxsplit=1))[0] == '_':
-            # print(f"{globals['__name__'].ljust(40)}: name: {name}, len(locals): {len(locals) if locals else 0}, fromList: {fromlist}, level: {level}")
-            if not fromlist:
-                raise CoppertopImportError("_ is a virtual package that cannot be imported and has no importable submodules - usage is 'from _.x.y import z'")
-            if (frombmod := sys._bmodules.get(name, Missing)) is Missing:
-                sys._oldImportFnForCoppertop(splits[1], globals, locals, fromlist, level)
-                frombmod = sys._bmodules.get(name, Missing)
-            namesToImport = fromlist
-            if namesToImport[0] == '*':
-                namesToImport = []
-                for k, fn in frombmod.__dict__.items():
-                    if isinstance(fn, (jones._nullary, jones._unary, jones._binary, jones._ternary)):
-                        namesToImport.append(k)
-            if globals['__name__'] == '__main__':
-                tobmodname = SCRATCH
-                tobmod = sys._bmodules.get(SCRATCH, Missing)
-            else:
-                tobmodname = '_.' + globals['__name__']
-                tobmod = sys._bmodules.get(tobmodname, Missing)
-            return _importFromBonesModule(name, frombmod, tobmodname, tobmod, globals, namesToImport)
+def _coppertopImportFn(name, globals=None, locals=None, fromlist=(), level=0):
+    if (splits := name.split('.', maxsplit=1))[0] == '_':
+        # print(f"{globals['__name__'].ljust(40)}: name: {name}, len(locals): {len(locals) if locals else 0}, fromList: {fromlist}, level: {level}")
+        if not fromlist:
+            raise CoppertopImportError("_ is a virtual package that cannot be imported and has no importable submodules - usage is 'from _.x.y import z'")
+        if (frombmod := sys._bmodules.get(name, Missing)) is Missing:
+            sys._preCoppertopImportFn(splits[1], globals, locals, fromlist, level)
+            frombmod = sys._bmodules.get(name, Missing)
+        namesToImport = fromlist
+        if namesToImport[0] == '*':
+            namesToImport = []
+            for k, fn in frombmod.__dict__.items():
+                if isinstance(fn, (jones._nullary, jones._unary, jones._binary, jones._ternary)):
+                    namesToImport.append(k)
+        if globals['__name__'] == '__main__':
+            tobmodname = SCRATCH
+            tobmod = sys._bmodules.get(SCRATCH, Missing)
         else:
-            mod = sys._oldImportFnForCoppertop(name, globals, locals, fromlist, level)
-            return mod
+            tobmodname = '_.' + globals['__name__']
+            tobmod = sys._bmodules.get(tobmodname, Missing)
+        return _importFromBonesModule(name, frombmod, tobmodname, tobmod, globals, namesToImport)
+    else:
+        mod = sys._preCoppertopImportFn(name, globals, locals, fromlist, level)
+        return mod
 
-    builtins.__import__ = _newImport
+sys._coppertopImportFn = _coppertopImportFn
+
+if not hasattr(sys, '_coppertopImportFnHolder'):
+    def _coppertopImportFnHolder(name, globals=None, locals=None, fromlist=(), level=0):
+        return sys._coppertopImportFn(name, globals, locals, fromlist, level)
+    sys._preCoppertopImportFn = builtins.__import__
+    builtins.__import__ = _coppertopImportFnHolder
 
 
-# public functions - put into bones.core
-typeOf = coppertop(name='typeOf', dispatchEvenIfAllTypes=True)(_typeOf)
-sig = coppertop(name='sig')(_sig)
-fitsWithin = coppertop(name='fitsWithin', style=binary, dispatchEvenIfAllTypes=True)(_fitsWithin)
-fitsWithin_ = coppertop(name='fitsWithin_', style=binary, dispatchEvenIfAllTypes=True)(_fitsWithin_)
-type = coppertop(name='type', dispatchEvenIfAllTypes=True)(_type)
+
+# **********************************************************************************************************************
+# essential public functions - put into bones.core?
+# **********************************************************************************************************************
+
+@coppertop(style=binary, dispatchEvenIfAllTypes=True)
+def fitsWithin(a, b):
+    doesFit, tByT, distances = cacheAndUpdate(origFitsWithin(a, b), {})
+    return doesFit
+
+@coppertop(style=binary, dispatchEvenIfAllTypes=True)
+def fullFitsWithin(a, b):
+    x = origFitsWithin(a, b)
+    cacheAndUpdate(x, {})
+    return x
+
+def makeFn(*args):
+    if len(args) == 1:
+        name, _t, pyfn = Missing, Missing, args[0]
+    elif len(args) == 2:
+        name, _t, pyfn = Missing, args[0], args[1]
+    elif len(args) == 3:
+        name, _t, pyfn = args[0], args[1], args[2]
+    else:
+        raise TypeError('Wrong number of args passed to partial', ErrSite("#1"))
+    modname, bmod, umod, fnname, priorPy, enclosingFnName, argNames, sig, tRet, pass_tByT = _fnContext(pyfn, 'anon', name)
+    if _t is Missing:
+        _t = BTFn(BTTuple(*[py] * len(argNames)), py)
+    fn = _Function(
+        name=fnname, modname=modname,
+        style=unary, pyfn=pyfn, dispatchEvenIfAllTypes=False, typeHelper=Missing, _t=_t, argNames=argNames, pass_tByT=False
+    )
+    d = _Dispatcher(fn)
+    return jones._unary(fnname, modname, d, _UNDERSCORE)
+
+@coppertop
+def sig(x):
+    if isinstance(x, function):
+        return f'{x.__name__} is a Python function'
+    x = x.d
+    if isinstance(x, _Dispatcher):
+        answer = []
+        for fnBySig in x.fnBySigByNumArgs:
+            for sig, d in fnBySig.items():
+                argTs = [_ppType(argT) for argT in sig]
+                retT = _ppType(d.tRet)
+                answer.append(f'({",".join(argTs)})->{retT} <{d.style.name}>  :   in {d.fullname}')
+        return answer
+    else:
+        argTs = [_ppType(argT) for argT in x.sig]
+        retT = _ppType(x.tRet)
+        return f'({",".join(argTs)})->{retT} <{x.style.name}>  :   in {x.fullname}'
+
+@coppertop(dispatchEvenIfAllTypes=True)
+def type(x):
+    return builtins.type(x)
+
+@coppertop(dispatchEvenIfAllTypes=True)
+def typeOf(x):
+    return _typeOf(x)
 
 
 
