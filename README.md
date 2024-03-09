@@ -7,9 +7,6 @@ Coppertop provides an alternative programming experience in Python via the follo
 * piping syntax
 * an embryonic [core library](https://github.com/coppertop-bones/dm/tree/main/src/dm) of common functions
 
-https://github.com/coppertop-bones/dm
-
-
 <br>
 
 
@@ -149,11 +146,23 @@ actual >> check >> equal >> [4, 6]
 <br> 
 
 
-### Example - Cluedo notepad
+### Examples
 
-See [algos.py](https://github.com/coppertop-bones/dm/blob/main/examples/dm/examples/cluedo/algos.py), where 
-we track a game of Cluedo and infer who did it. See [ex_games.py](https://github.com/coppertop-bones/dm/blob/main/examples/dm/examples/cluedo/ex_games.py) 
-for example game input.
+#### Bag of M&Ms problem 
+
+In [Why coppertop - MM problem from Think Bayes.ipynb](
+https://github.com/coppertop-bones/dm/blob/main/jupyter/Why%20coppertop%20-%20MM%20problem%20from%20Think%20Bayes.ipynb
+) we implement a coppertop solution to the problem and silently introduce intersection types.
+
+#### Cluedo notepad
+
+See [algos.py](
+https://github.com/coppertop-bones/dm/blob/main/examples/dm/examples/cluedo/algos.py
+), where we track a game of Cluedo and infer who did it. See [ex_games.py](
+https://github.com/coppertop-bones/dm/blob/main/examples/dm/examples/cluedo/ex_games.py
+) and [cluedo-pad.ipynb](
+https://github.com/coppertop-bones/dm/blob/main/jupyter/cluedo-pad.ipynb
+) for example game input and notepad output.
 
 <br>
 
@@ -175,114 +184,42 @@ from dm.core import to
 <br>
 
 
-### Appendix - comparison of unary piping with other languages
-
-Python (using the @coppertop decorator)
-
-```
-@coppertop     # default is unary
-def unaryAddOne(x):
-  return x + 1
-
-@coppertop
-def unaryAdd2Args(x, y):
-  return x + y
-
-@coppertop
-def unaryAdd3Args(x, y, z):
-  return x + y + z
-
-unaryAddOne(1)
-1 >> unaryAddOne
-
-unaryAdd2Args(1,2)
-1 >> unaryAdd2Args(_,2)
-2 >> unaryAdd2Args(1,_)
-
-unaryAdd3Args(1,2,3)
-1 >> unaryAdd3Args(_,2,3)
-2 >> unaryAdd3Args(1,_,3)
-3 >> unaryAdd3Args(1,2,_)
-```
-
-R - TBD
-
-```
-# with magrittr
-```
-
-q / kdb (an APL derivative)
-
-```
-unaryAddOne: {x + 1}
-unaryAdd2args: {x + y}
-unaryAdd3Args: {x + y + z}
-
-unaryAddOne[1]
-unaryAddOne 1
-
-unaryAdd2Args[1;2]
-unaryAdd2Args[;2] 1
-unaryAdd2Args[1;] 2
-
-unaryAdd3Args[1;2;3]
-unaryAdd3Args[;2;3] 1
-unaryAdd3Args[1;;3] 2
-unaryAdd3Args[1;2;] 3
-```
+### Other
+* [Hadley Wickham on pipes](https://r4ds.had.co.nz/pipes.html)
+* [Comparison of coppertop style with other piped languages](./docs/compare-with-other-piped-languages.md)
 
 <br>
 
-F# / OCaml
+### Thanks
 
-```
-unaryAddOne x = x + 1
-unaryAdd2Args x y = x + y
-unaryAdd3Args x y z = x + y + z
+#### Inspired by
+* [Magrittr](
+https://magrittr.tidyverse.org/
+) - a piping library for R
+* [Arthur Whitney's](
+https://en.wikipedia.org/wiki/Arthur_Whitney_(computer_scientist)
+) ideas especially [kdb/q](https://code.kx.com/q/) and C style e.g. a [tiny k interpreter for educational purposes](
+https://github.com/kparc/ksimple
+)
+* Smalltalk - especially the ideas of [Alan Kay](
+https://en.wikipedia.org/wiki/Alan_Kay
+) & [Rebecca Wirfs-Brock](
+https://en.wikipedia.org/wiki/Rebecca_Wirfs-Brock
+) and the [VisualWorks](
+https://www.cincomsmalltalk.com/main/products/visualworks/
+) and [Cuis](
+https://cuis.st/
+) implementations
+* [Alexander A. Stepanov's](
+http://stepanovpapers.com/
+) ideas on templating and generics
 
-unaryAddOne 1
-1 |> unaryAddOne
+#### Built using
 
-unaryAdd2Args 1 2
-2 |> unaryAdd2Args 1
+<p><a href="https://www.jetbrains.com/pycharm/">
+<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/PyCharm.svg" width="200" height="100">
+</a></p>
 
-unaryAdd3Args 1 2 3
-3 |> unaryAdd3Args 1 2
-```
-
-Smalltalk
-
-```
-unaryAddOne
-    ^ self + 1
-
-unaryAdd2Args: y
-    ^ self + y
-
-unaryAdd3Args: y with: z
-    ^ self + y + z
-
-1 addOne
-1 unaryAdd2Args: 2
-1 unaryAdd3Args: 2 with: 3
-```
-
-bones (influenced by q/kdb and Smalltalk)
-
-```
-unaryAddOne: {x + 1}
-unaryAdd2Args: {x + y}
-unaryAdd3Args: {x + y + z}
-
-unaryAddOne(1)
-1 unaryAddOne
-
-unaryAdd2Args(1,2)
-1 unaryAdd2Args(,2)
-2 unaryAdd2Args(1,)
-
-unaryAdd3Args(1,2,3)
-1 unaryAdd2Args(,2,3)
-2 unaryAdd2Args(1,,3)
-3 unaryAdd2Args(1,2,)
-```
+<p><a href="https://www.jetbrains.com/clion/">
+<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/CLion.svg" width="160" height="80">
+</a></p>
