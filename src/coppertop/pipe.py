@@ -564,6 +564,12 @@ class _Dispatcher(object):
         return self.name
 
 
+
+# **********************************************************************************************************************
+# Utilities
+# **********************************************************************************************************************
+
+
 def _typeOf(x):
     if hasattr(x, '_t'):
         return x._t                     # it's a tv of some sort so return the t
@@ -576,6 +582,24 @@ def _typeOf(x):
         if t is _CoWProxy:
             t = builtins.type(x._target)         # return the type of thing being proxied
         return _aliases.get(t, t)       # type python types as their bones equivalent
+
+
+def _sig(x):
+    if isinstance(x, function):
+        return f'{x.__name__} is a Python function'
+    x = x.d
+    if isinstance(x, _Dispatcher):
+        answer = []
+        for fnBySig in x.fnBySigByNumArgs:
+            for sig, d in fnBySig.items():
+                argTs = [_ppType(argT) for argT in sig]
+                retT = _ppType(d.tRet)
+                answer.append(f'({",".join(argTs)})->{retT} <{d.style.name}>  :   in {d.fullname}')
+        return answer
+    else:
+        argTs = [_ppType(argT) for argT in x.sig]
+        retT = _ppType(x.tRet)
+        return f'({",".join(argTs)})->{retT} <{x.style.name}>  :   in {x.fullname}'
 
 
 
@@ -713,21 +737,7 @@ def makeFn(*args):
 
 @coppertop
 def sig(x):
-    if isinstance(x, function):
-        return f'{x.__name__} is a Python function'
-    x = x.d
-    if isinstance(x, _Dispatcher):
-        answer = []
-        for fnBySig in x.fnBySigByNumArgs:
-            for sig, d in fnBySig.items():
-                argTs = [_ppType(argT) for argT in sig]
-                retT = _ppType(d.tRet)
-                answer.append(f'({",".join(argTs)})->{retT} <{d.style.name}>  :   in {d.fullname}')
-        return answer
-    else:
-        argTs = [_ppType(argT) for argT in x.sig]
-        retT = _ppType(x.tRet)
-        return f'({",".join(argTs)})->{retT} <{x.style.name}>  :   in {x.fullname}'
+    return _sig(x)
 
 @coppertop(dispatchEvenIfAllTypes=True)
 def type(x):

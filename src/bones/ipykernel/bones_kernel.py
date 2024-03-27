@@ -29,7 +29,7 @@ from bones.kernel import psm
 from bones.kernel.bones import BonesKernel
 from bones.lang.execute import TCInterpreter
 from bones.lang.core import GLOBAL, SCRATCH
-from bones.lang.ctx import Ctx
+from bones.lang.symbol_table import SymTab
 
 
 from traitlets import Any, Bool, Instance, List, Type, observe, observe_compat
@@ -53,12 +53,12 @@ _groupCommands = ['restartAll']
 def _newKernel():
     sm = psm.PythonStorageManager()
     k = BonesKernel(sm)
-    k.ctxs[GLOBAL] = Ctx(k, Missing, Missing, Missing, Missing, GLOBAL)
-    k.ctxs[SCRATCH] = scratchCtx = Ctx(k, Missing, Missing, Missing, k.ctxs[GLOBAL], SCRATCH)
+    k.ctxs[GLOBAL] = SymTab(k, Missing, Missing, Missing, Missing, GLOBAL)
+    k.ctxs[SCRATCH] = scratchCtx = SymTab(k, Missing, Missing, Missing, k.ctxs[GLOBAL], SCRATCH)
     k.scratch = scratchCtx
     k.tcrunner = TCInterpreter(k, scratchCtx)
-    sm.frameForCtx(k.ctxs[GLOBAL])
-    sm.frameForCtx(k.ctxs[SCRATCH])
+    sm.framesForSymTab(k.ctxs[GLOBAL])
+    sm.framesForSymTab(k.ctxs[SCRATCH])
     return k
 
 
