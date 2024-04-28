@@ -27,22 +27,22 @@ __all__ = [
 ]
 
 from bones.core.sentinels import Null, Void
-from bones.lang.metatypes import BTAtom, BType
+from bones.lang.metatypes import BTNom, BType
 
 
-noun = BTAtom.define("noun")
-nullary = BTAtom.define("nullary")
-unary = BTAtom.define("unary")
-binary = BTAtom.define("binary")
-ternary = BTAtom.define("ternary")
+noun = BTNom.define("noun")
+nullary = BTNom.define("nullary")
+unary = BTNom.define("unary")
+binary = BTNom.define("binary")
+ternary = BTNom.define("ternary")
 
 # obj is used in setOrthogonal to show the type and an object of some sort and thus the intersection with
 # other orthogonal(obj) types is uninhabited
-obj = BTAtom.define("obj")
+obj = BTNom.define("obj")
 
-TBI = BTAtom.define("TBI").setOrthogonal(obj)
-void = BTAtom.define('void').setOrthogonal(obj)     # something that isn't there and shouldn't be there
-null = BTAtom.define('null')                        # the null set - something that isn't there and that's okay
+TBI = BTNom.define("TBI").setOrthogonal(obj)
+void = BTNom.define('void').setOrthogonal(obj)     # something that isn't there and shouldn't be there
+null = BTNom.define('null')                        # the null set - something that isn't there and that's okay
 
 Null._t = null
 Void._t = void
@@ -50,18 +50,18 @@ Void._t = void
 # so we can have more than one class for frames (and tups and structs, maybe less likely)
 # dframe = frame[tvstruct].nameAs('dframe')
 # polarframe = frame[pl.DataFrame].nameAs('polarframe')
-tup = BTAtom.define('tup')
-struct = BTAtom.define('struct')
-frame = BTAtom.define('frame')
+tup = BTNom.define('tup')
+struct = BTNom.define('struct')
+frame = BTNom.define('frame')
 
 
 # literal types used in parser
-litint = BTAtom.define('litint').setOrthogonal(obj)
-litdec = BTAtom.define('litdec').setOrthogonal(obj)
-littxt = BTAtom.define('littxt').setOrthogonal(obj)      # this allows us to provide different encodings in source and map to the core one
-litsym = BTAtom.define('litsym').setOrthogonal(obj)
-litsyms = BTAtom.define('litsyms').setOrthogonal(obj)
-litdate = BTAtom.define('litdate').setOrthogonal(obj)
+litint = BTNom.define('litint').setOrthogonal(obj)
+litdec = BTNom.define('litdec').setOrthogonal(obj)
+littxt = BTNom.define('littxt').setOrthogonal(obj)      # this allows us to provide different encodings in source and map to the core one
+litsym = BTNom.define('litsym').setOrthogonal(obj)
+litsyms = BTNom.define('litsyms').setOrthogonal(obj)
+litdate = BTNom.define('litdate').setOrthogonal(obj)
 littup = tup['littup'].setOrthogonal(obj)
 litstruct = struct['litstruct'].setOrthogonal(obj)
 litframe = frame['litframe'].setOrthogonal(obj)

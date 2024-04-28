@@ -79,12 +79,12 @@ from coppertop._scopes import _CoWProxy, _UNDERSCORE
 from bones.core.errors import ProgrammerError, ErrSite, CPTBError, NotYetImplemented
 from bones.core.sentinels import Missing, function
 from bones.core.utils import firstKey, raiseLess
-from bones.lang.metatypes import BType, fitsWithin as origFitsWithin, cacheAndUpdate, BTFn, BTTuple, BTAtom, BTOverload, _BTypeById, _aliases
+from bones.lang.metatypes import BType, fitsWithin as origFitsWithin, cacheAndUpdate, BTFn, BTTuple, BTNom, BTOverload, _BTypeById, _aliases
 from bones.lang.types import nullary, unary, binary, ternary, void, obj
 from bones.lang.select import _ppType, _selectFunction
 
 
-py = BTAtom.ensure("py").setOrthogonal(obj)
+py = BTNom.ensure("py").setOrthogonal(obj)
 
 class CoppertopError(CPTBError): pass
 class CoppertopImportError(ImportError): pass
@@ -327,7 +327,7 @@ def _tArgFromAnnotation(annotation, modname, fnnameForErr, msgForErr):
     elif isinstance(annotation, builtins.type):
         if (tArg := _aliases.get(annotation, Missing)) is Missing:
             name = annotation.__module__ + "." + annotation.__name__
-            tArg = BTAtom.ensure(name)
+            tArg = BTNom.ensure(name)
             _aliases[annotation] = tArg
         return tArg
     elif annotation in _unhandledTypes:

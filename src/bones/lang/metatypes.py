@@ -12,7 +12,7 @@
 # **********************************************************************************************************************
 
 # BY DESIGN
-# 1) we allow aType['name'] as shorthand for aType[BTAtom('_name')].nameAs('name')  - albeit at the slightly increased
+# 1) we allow aType['name'] as shorthand for aType[BTNom('_name')].nameAs('name')  - albeit at the slightly increased
 #    chance of misspelling errors
 #
 # SPEED OPTIONS - SoA style on the list of types, etc - this may also make translation to C easier
@@ -20,7 +20,7 @@
 # if accessing globals becomes an issue could make the whole module a class
 
 # BType
-#   |--- BTAtom
+#   |--- BTNom
 #   |        \--- BTSchemaVariable
 #   |--- _BTSetOp
 #   |        |--- BTUnion
@@ -54,18 +54,22 @@ _idSeed = itertools.count(start=1)   # reserve id 0 as a terminator of a type se
 REPL_OVERRIDE_MODE = False
 
 _BTypeByName = {}
-_BTAtomByName = {}
+_BTNomByName = {}
 _BTypeById = [Missing] * 1000
 _aliases = {}                   # mappings from python types to bones types
 
 
+from bones import jones
 from bones.jones import BType as BTypeRoot
+
+if not hasattr(sys, '_sharedKernel'):
+    sys._sharedKernel = jones.Kernel()
 
 
 def getBTypeForClass(cls):
     if (t := _aliases.get(cls, Missing)) is Missing:
         name = cls.__module__ + "." + cls.__name__
-        t = BTAtom.ensure(name)
+        t = BTNom.ensure(name)
         _aliases[cls] = t
     return t
 
@@ -80,11 +84,11 @@ class BType(BTypeRoot):
     # TYPE CONSTRUCTION & NAMING
 
     @classmethod
-    def _define(cls):
+    def _define(cls, bt):
         assert cls is not BType
-        id = next(_idSeed)
         instance = super().__new__(cls)
-        instance.id = id
+        if bt.id == 0: raise TypeError('id == 0')
+        instance.id = bt.id
         instance.name = Missing
         instance.hasT = False
         instance.familial = False
@@ -324,7 +328,7 @@ class BType(BTypeRoot):
             return BTIntersection(self, *rhs)
         elif isinstance(rhs, str):
             name = rhs
-            tag = BTAtom.ensure(f'_{name}')         # checks that there is no name conflict
+            tag = BTNom.ensure(f'_{name}')         # checks that there is no name conflict
             instance = BTIntersection(self, tag)
             if instance.name is Missing:
                 instance.nameAs(name)
@@ -392,31 +396,37 @@ class BType(BTypeRoot):
     #     _BTypeById[id] = Missing
 
 
+def raiseCantNameBTypeError(this, name, other):
+    raise TypeError(
+        f"Can't name new type ({type(this)}) as '{name}' as another BType({type(other)}) already has that name"
+    )
 
 
-class BTAtom(BType):
+class BTNom(BType):
 
     def __new__(cls, name):
         # gets a type throwing an error if it has not already been defined
-        if (instance := _BTAtomByName.get(name, Missing)) is Missing:
+        if (instance := _BTNomByName.get(name, Missing)) is Missing:
             raise TypeError(f'Unknown type "{name}"')
         return instance
 
     @classmethod
     def define(cls, name):
-        if name in _BTAtomByName:
-            raise TypeError(f'{name} is already defined')
-        instance = cls._define().nameAs(name)
-        _BTAtomByName[name] = instance
+        bt = sys._sharedKernel.tm.nominal(name)
+        if name in _BTNomByName: raise TypeError(f'{name} is already defined')
+        instance = cls._define(bt).nameAs(name)
+        _BTNomByName[name] = instance
         return instance
 
     @classmethod
     def ensure(cls, name):
         # creates a new type if one does not already exists with the provided name
-        if (instance := _BTAtomByName.get(name, Missing)) is Missing:
-            if name in _BTypeByName: raise TypeError(f'{name} is already defined')
-            instance = cls._define().nameAs(name)
-            _BTAtomByName[name] = instance
+        if (instance := _BTNomByName.get(name, Missing)) is Missing:
+            if (other := _BTypeByName.get(name, Missing)):
+                raise TypeError(f'Another BType({type(other)}) is already named {name}')
+            bt = sys._sharedKernel.tm.nominal(name)
+            instance = cls._define(bt).nameAs(name)
+            _BTNomByName[name] = instance
         return instance
 
     def ppName(self):
@@ -424,19 +434,19 @@ class BTAtom(BType):
 
 
 
-class BTSchemaVariable(BTAtom):
+class BTSchemaVariable(BTNom):
     # T1, T2, etc - NB: the term schema means a model / schematic whereas the term scheme means a plan of action
 
     __slots__ = ['subscript', 'base']
 
     @classmethod
     def define(cls, name):
-        if name in _BTAtomByName or name in _BTypeByName:
-            raise TypeError(f'{name} is already defined')
-        instance = cls._define().nameAs(name)
+        bt = sys._sharedKernel.tm.schemavar(name)
+        if name in _BTNomByName or name in _BTypeByName: raise TypeError(f'{name} is already defined')
+        instance = cls._define(bt).nameAs(name)
         instance.subscript = Missing
         instance.base = instance
-        _BTAtomByName[name] = instance
+        _BTNomByName[name] = instance
         return instance
 
     @classmethod
@@ -444,9 +454,11 @@ class BTSchemaVariable(BTAtom):
         raise NotImplementedError('ensure is not allowed')
 
     def ensure(self, subscript):
+        # 1/0
         name = self.name + subscript.name
-        if (instance := _BTAtomByName.get(name, Missing)) is Missing:
-            assert isinstance(subscript, BTAtom)
+        if (instance := _BTNomByName.get(name, Missing)) is Missing:
+            bt = sys._sharedKernel.tm.schemavar(name)
+            assert isinstance(subscript, BTNom)
             assert self.subscript is Missing
             instance = BTSchemaVariable.define(name)
             instance.subscript = subscript
@@ -473,7 +485,8 @@ class BTUnion(_BTSetOp):
         if len(types) == 1:
             return types[0]
         if (instance := cls._typeByTypes.get(types, Missing)) is Missing:
-            instance = super()._define()
+            bt = sys._sharedKernel.tm.union(*types)
+            instance = super()._define(bt)
             instance.types = types
             instance.hasT = flags.hasT
             instance.familial = flags.familial
@@ -524,7 +537,8 @@ class BTIntersection(_BTSetOp):
                 for t in types:
                     if not isinstance(types[0], BTFn):
                         raise TypeError("Only BTFns allow in an overload")
-            instance = super()._define()
+            bt = sys._sharedKernel.tm.intersection(*types)
+            instance = super()._define(bt)
             instance.types = types
             instance.hasT = flags.hasT
             instance.orthogonal = flags.orthogonal
@@ -717,7 +731,8 @@ class BTTuple(BType):
     def __new__(cls, *types):
         # allow empty tuple and tuple of one
         if (instance := cls._BTTupleByTypes.get(types, Missing)) is Missing:
-            instance = super()._define()
+            bt = sys._sharedKernel.tm.tuple(*types)
+            instance = super()._define(bt)
             instance.types = types
             instance.hasT = _anyHasT(*types)
             cls._BTTupleByTypes[types] = instance
@@ -766,7 +781,8 @@ class BTStruct(BType):
         if len(names) != len(types):
             raise TypeError('names and tyoes must be of same length')
         if (instance := cls._BTStructByTypes.get((names, types), Missing)) is Missing:
-            instance = super()._define()
+            bt = sys._sharedKernel.tm.struct(names, types)
+            instance = super()._define(bt)
             instance.typeByName = typeByName
             instance.hasT = _anyHasT(*types)
             cls._BTStructByTypes[(names, types)] = instance
@@ -799,7 +815,8 @@ class BTSeq(BType):
             raise TypeError(f'First arg must be an ordinal type placeholder, got {ordinalType}')
         types = (ordinalType, mappedType)
         if (instance := cls._BTSeqByTypes.get(types, Missing)) is Missing:
-            instance = super()._define()
+            bt = sys._sharedKernel.tm.seq(mappedType)
+            instance = super()._define(bt)
             instance.indexType = ordinalType
             instance.mappedType = mappedType
             instance.hasT = _anyHasT(*types)
@@ -823,7 +840,8 @@ class BTMap(BType):
     def __new__(cls, indexType, mappedType):
         types = (indexType, mappedType)
         if (instance := cls._BTMapByTypes.get(types, Missing)) is Missing:
-            instance = super()._define()
+            bt = sys._sharedKernel.tm.map(indexType, mappedType)
+            instance = super()._define(bt)
             instance.indexType = indexType
             instance.mappedType = mappedType
             instance.hasT = _anyHasT(*types)
@@ -851,7 +869,8 @@ class BTFn(BType):
             tArgs = BTTuple(*tArgs)
         types = (tArgs, tRet)
         if (instance := cls.BTFnByTypes.get(types, Missing)) is Missing:
-            instance = super()._define()
+            bt = sys._sharedKernel.tm.fn(tuple(t for t in tArgs), tRet)
+            instance = super()._define(bt)
             instance.tArgs = tArgs
             instance.tRet = tRet
             instance.hasT = _anyHasT(tArgs, tRet)  # either a BTTuple or a single type
@@ -1235,7 +1254,7 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
         else:
             return (cacheId, False, _, _)
 
-    elif isinstance(b, BTAtom):
+    elif isinstance(b, BTNom):
         # already a.id != b.id so must be False
         return (cacheId, False, _, _)
 
@@ -1471,7 +1490,7 @@ def schemaVariableForOrd(ord):
         i2 = i1 + 20 - 1
         _schemaVariablesByOrd += [Missing] * 20   # allocate 20 extra each time
         for i in range(i1, i2 + 1):
-            _schemaVariablesByOrd[i] = T.ensure(BTAtom.ensure(f'{i}'))
+            _schemaVariablesByOrd[i] = T.ensure(BTNom.ensure(f'{i}'))
     return _schemaVariablesByOrd[ord]
 
 
@@ -1484,7 +1503,7 @@ for i in range(1, 21):
     locals()[Ti.name] = Ti
 
 for o in range(26):
-    To = T.ensure(BTAtom.ensure(chr(ord('a')+o)))
+    To = T.ensure(BTNom.ensure(chr(ord('a')+o)))
     locals()[To.name] = To
 
 
@@ -1492,12 +1511,12 @@ N = BTSchemaVariable.define('N')
 _ordinalTypes = [N]
 
 for i in range(1, 11):
-    Ni = N.ensure(BTAtom.ensure(f'{i}'))
+    Ni = N.ensure(BTNom.ensure(f'{i}'))
     _ordinalTypes.append(Ni)
     locals()[Ni.name] = Ni
 
 for o in range(26):
-    No = N.ensure(BTAtom.ensure(chr(ord('a')+o)))
+    No = N.ensure(BTNom.ensure(chr(ord('a')+o)))
     _ordinalTypes.append(No)
     locals()[No.name] = No
 

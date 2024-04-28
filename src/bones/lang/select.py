@@ -17,12 +17,12 @@ if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 from bones.core.context import context
 from bones.core.sentinels import Missing
 from bones.core.errors import ProgrammerError, ErrSite
-from bones.lang.metatypes import cacheAndUpdate, fitsWithin, BTAtom
+from bones.lang.metatypes import cacheAndUpdate, fitsWithin, BTNom
 from bones.lang.types import obj
 from bones.core.utils import raiseLess
 
 
-py = BTAtom.ensure("py").setOrthogonal(obj)
+py = BTNom.ensure("py").setOrthogonal(obj)
 
 
 def _selectFunction(callerSig, fnBySig, nameForError, fnBySigByNumArgsForError):
