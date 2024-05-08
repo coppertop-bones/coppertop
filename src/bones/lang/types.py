@@ -56,7 +56,7 @@ frame = BTNom.define('frame')
 
 
 # literal types used in parser
-litint = BTNom.define('litint').setOrthogonal(obj)
+litint = BTNom.ensure('litint').setOrthogonal(obj)      # OPEN: sort out standard types
 litdec = BTNom.define('litdec').setOrthogonal(obj)
 littxt = BTNom.define('littxt').setOrthogonal(obj)      # this allows us to provide different encodings in source and map to the core one
 litsym = BTNom.define('litsym').setOrthogonal(obj)

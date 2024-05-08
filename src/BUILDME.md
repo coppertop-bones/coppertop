@@ -1,1 +1,1 @@
-do `python setup.py build_ext` in a shell 
+do `python setup.py build_ext --force` in a shell 
