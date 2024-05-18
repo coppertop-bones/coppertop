@@ -19,11 +19,18 @@ setuptools.setup(
         'bones.lang',
         'coppertop',
     ],
-    ext_modules=[setuptools.Extension(
-        "bones.jones",
-        [os.path.join(parent_folder, "bk/src/jones/jones.c")],
-        include_dirs=[python_include_dir],
-    )],
+    ext_modules=[
+        setuptools.Extension(
+            "bones.jones",
+            [os.path.join(parent_folder, "bk/src/jones/jones.c")],
+            include_dirs=[python_include_dir],
+        ),
+        setuptools.Extension(
+            "bones.jones.qu",
+            [os.path.join(parent_folder, "bk/src/jones/jones_qu.c")],
+            include_dirs=[python_include_dir],
+        ),
+    ],
     # package_dir = {'': 'core'},
     # namespace_packages=['coppertop_'],
     version=version,
