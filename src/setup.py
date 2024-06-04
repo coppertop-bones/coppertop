@@ -26,8 +26,8 @@ setuptools.setup(
             include_dirs=[python_include_dir],
         ),
         setuptools.Extension(
-            "bones.jones.qu",
-            [os.path.join(parent_folder, "bk/src/jones/jones_qu.c")],
+            "bones.qu",
+            [os.path.join(parent_folder, "bk/src/jones/qu.c")],
             include_dirs=[python_include_dir],
         ),
     ],
