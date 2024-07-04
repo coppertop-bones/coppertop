@@ -22,12 +22,12 @@ setuptools.setup(
     ext_modules=[
         setuptools.Extension(
             "bones.jones",
-            [os.path.join(parent_folder, "bk/src/jones/jones.c")],
+            [os.path.join(parent_folder, "bk/src/jones/mod_jones.c")],
             include_dirs=[python_include_dir],
         ),
         setuptools.Extension(
             "bones.qu",
-            [os.path.join(parent_folder, "bk/src/jones/qu.c")],
+            [os.path.join(parent_folder, "bk/src/jones/mod_qu.c")],
             include_dirs=[python_include_dir],
         ),
     ],
