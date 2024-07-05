@@ -23,7 +23,7 @@ from bones.lang.metatypes import BType
 from bones.lang.utils import Constructors
 
 
-class tv(object):
+class tv:
     __slots__ = ['_t_', '_v_', '_hash']
     def __init__(self, _t, _v):
         _t = _t[0] if isinstance(_t, Constructors) else _t
@@ -63,12 +63,12 @@ class tv(object):
         return self._hash
 
 
-class tvtuple(object):
+class tvtuple:
     def __init__(self):
         raise NotYetImplemented
 
 
-class tvstruct(object):
+class tvstruct:
     __slots__ = ['_pub', '_pvt']
 
     def __init__(self, *args_, **kwargs):

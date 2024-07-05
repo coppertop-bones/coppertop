@@ -79,7 +79,8 @@ from coppertop._scopes import _CoWProxy, _UNDERSCORE
 from bones.core.errors import ProgrammerError, ErrSite, CPTBError, NotYetImplemented
 from bones.core.sentinels import Missing, function
 from bones.core.utils import firstKey, raiseLess
-from bones.lang.metatypes import BType, fitsWithin as origFitsWithin, cacheAndUpdate, BTFn, BTTuple, BTNom, BTOverload, _BTypeById, _aliases
+from bones.lang.metatypes import BType, fitsWithin as origFitsWithin, cacheAndUpdate, BTFn, BTTuple, BTNom, \
+    BTOverload, _BTypeById, _aliases, BTypeError
 from bones.lang.types import nullary, unary, binary, ternary, void, obj
 from bones.lang.select import _ppType, _selectFunction
 
@@ -349,7 +350,7 @@ def _tArgFromAnnotation(annotation, modname, fnnameForErr, msgForErr):
 # Dispatch
 # **********************************************************************************************************************
 
-class _Function(object):
+class _Function:
 
     __slots__ = [
         'style', 'name', '_t', 'modname', 'pyfn', '_argNames', 'sig', 'tArgs', 'tRet',
@@ -387,7 +388,7 @@ class _Function(object):
         return self.name
 
 
-class _Dispatcher(object):
+class _Dispatcher:
 
     __slots__ = ['style', 'name', '_t_', 'fnBySigByNumArgs', 'cacheByNumArgs', '__doc__']
 

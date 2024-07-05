@@ -14,6 +14,7 @@
 import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
+from bones.jones import BTypeError
 from bones.core.context import context
 from bones.core.sentinels import Missing
 from bones.core.errors import ProgrammerError, ErrSite
@@ -114,7 +115,7 @@ def _cantFindMatchError(sig, nameForError, fnBySigByNumArgsForError):
             for fnSig, fn in fnBySig.items():
                 context.EE(f'  {_ppFn(fn.name, fnSig)} in {fn.modname} - {fn.fullname}')
 
-    return TypeError(f"Can't find {_ppFn(nameForError, sig)}")
+    return BTypeError(f"Can't find {_ppFn(nameForError, sig)}")
 
 
 def _ppFn(name, sig, argNames=Missing):
