@@ -27,7 +27,7 @@ def _ensureSentinels():
 
     # something should / could be there but it is definitely not there
     if not hasattr(sys, '_Missing'):
-        class Missing(object):
+        class Missing:
             def __bool__(self):
                 return False
             def __repr__(self):
@@ -39,7 +39,7 @@ def _ensureSentinels():
 
     # the null set
     if not hasattr(sys, '_NULL'):
-        class _NULL(object):
+        class _NULL:
             def __repr__(self):
                 # for pretty display in pycharm debugger
                 return 'Null'
@@ -50,7 +50,7 @@ def _ensureSentinels():
     # explaining what it is? at min it's not hard to do "There's an emergency going on" | +err >> signal
     # possibly in prototype code you could do Err >> signal, but why not Null | +err >> signal
     if not hasattr(sys, '_ERR'):
-        class _ERR(object):
+        class _ERR:
             def __repr__(self):
                 # for pretty display in pycharm debugger
                 return 'Err'
@@ -61,7 +61,7 @@ def _ensureSentinels():
     # undetectable and has no place in code - just as part of the
     # building process
     if not hasattr(sys, '_VOID'):
-        class _VOID(object):
+        class _VOID:
             def __bool__(self):
                 return False
             def __repr__(self):
@@ -76,7 +76,7 @@ def _ensureSentinels():
 
     # Just to indicate we are exiting early rather than ensuring if statements are fully complete
     if not hasattr(sys, '_ExitEarly'):
-        class EarlyExit(object):
+        class EarlyExit:
             def __bool__(self):
                 return False
             def __repr__(self):
