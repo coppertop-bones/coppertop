@@ -78,7 +78,7 @@ class BonesError(Exception):
 
 class SpellingError(BonesError): pass       # lex errors
 
-class GroupError(BonesError):           # grouping errors
+class GroupError(BonesError):               # grouping errors
     def __init__(self, msg, errSite, group, token):
         super().__init__(msg, errSite)
         self._group = group
@@ -92,7 +92,7 @@ class DictionaryError(BonesError): pass     # can't find a name in a phrase
 
 class AmbiguousVerbError(BonesError): pass  # aka does not understand, i.e. the necessary overload doesn't exist
 
-class LoadingError(BonesError): pass      # load tool.kit
+class LoadingError(BonesError): pass        # load tool.kit
 
 class ImportError(BonesError): pass         # e.g. from tools.bag import x - x doesn't exist
 
@@ -100,7 +100,7 @@ class ScopeError(BonesError): pass          # e.g. trying to get from or set in 
 
 
 
-class ErrSite(object):
+class ErrSite:
     def __init__(self, *args):
         # args are [class], [id]
         frame = inspect.currentframe()

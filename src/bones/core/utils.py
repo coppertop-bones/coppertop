@@ -87,7 +87,7 @@ def HookStdOutErrToLines():
         sys.stdout, sys.stderr = oldout, olderr
 
 
-class _StreamToLines(object):
+class _StreamToLines:
     def __init__(self):
         self.lines = []
         self.textBuffer = ""
@@ -101,7 +101,7 @@ class _StreamToLines(object):
             self.textBuffer += splits[-1:][0]
 
 
-class assertRaises(object):
+class assertRaises:
 
     def __init__(self, expectedExceptionType):
         self.expectedExceptionType = expectedExceptionType

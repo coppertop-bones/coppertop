@@ -59,7 +59,7 @@ _aliases = {}                   # mappings from python types to bones types
 
 
 from bones import jones
-from bones.jones import BType as BTypeRoot
+from bones.jones import BType as BTypeRoot, BTypeError
 
 if not hasattr(sys, '_sharedKernel'):
     sys._sharedKernel = jones.Kernel()
@@ -98,7 +98,7 @@ class BType(BTypeRoot):
     @classmethod
     def _define(cls, bt):
         assert cls is not BType
-        if bt.id == 0: raise TypeError('id == 0')
+        if bt.id == 0: raise BTypeError('id == 0')
         if bt.id >= len(_BTypeById): _BTypeById.extend([Missing] * 1000)
         instance = super().__new__(cls)
         instance.id = bt.id
@@ -170,7 +170,7 @@ class BType(BTypeRoot):
 
     def setCoercer(self, fnTV):
         if self.hasT:
-            raise TypeError(f'{self} has a T so cannot be an instance type')
+            raise BTypeError(f'{self} has a T so cannot be an instance type')
         if self._coercer is Missing:
             self._coercer = fnTV
         else:
@@ -182,7 +182,7 @@ class BType(BTypeRoot):
 
     def __ror__(self, instance):        # instance | type   the case of type | type should be caught first below
         if self.hasT:
-            raise TypeError(f'{self} has a T so cannot be an instance type')
+            raise BTypeError(f'{self} has a T so cannot be an instance type')
         elif hasattr(instance, '_asT'):
             # the instance has a coercion method
             return instance._asT(self)
@@ -191,7 +191,7 @@ class BType(BTypeRoot):
             return self._coercer(self, instance)
         else:
             msg = f'{instance} can\'t be coerced to <:{self}> - instance has no _asT, type has no _coercer'
-            raiseLess(TypeError(msg, ErrSite(self.__class__)))
+            raiseLess(BTypeError(msg, ErrSite(self.__class__)))
 
 
     # INSTANCE CONSTRUCTION
@@ -200,7 +200,7 @@ class BType(BTypeRoot):
         # COULDDO check that first arg of fnTV is t - I accidentally tried to use a bones type
         # as a constructor and it was hard to diagnose the cause of the bug I was seeing
         if self.hasT:
-            raise TypeError(f'{self} has a T so cannot be an instance type')
+            raise BTypeError(f'{self} has a T so cannot be an instance type')
         if self._constructor is not Missing and fnTV is not self._constructor and not REPL_OVERRIDE_MODE:
             raise ProgrammerError('constructor already set')
         self._constructor = fnTV
@@ -209,7 +209,7 @@ class BType(BTypeRoot):
     def __call__(self, *args, **kwargs):    # type(*args, **kwargs)
         # create a new instance using the constructor
         if self.hasT:
-            raise TypeError(f'{self} has a T so cannot be an instance type')
+            raise BTypeError(f'{self} has a T so cannot be an instance type')
         if self._constructor:
             if args and isinstance(args[0], Constructors):
                 cs = Constructors(args[0])
@@ -230,14 +230,14 @@ class BType(BTypeRoot):
         if isinstance(rhs, type):
             rhs = getBTypeForClass(rhs)
         elif not isinstance(rhs, BType):
-            raise TypeError(f'rhs should be a BType or type - got {repr(rhs)}')
+            raise BTypeError(f'rhs should be a BType or type - got {repr(rhs)}')
         return BTUnion(self, rhs)
 
     def __radd__(self, lhs):        # lhs + type
         if isinstance(lhs, type):
             lhs = getBTypeForClass(lhs)
         elif not isinstance(lhs, BType):
-            raise TypeError(f'lhs should be a BType or type - got {repr(lhs)}')
+            raise BTypeError(f'lhs should be a BType or type - got {repr(lhs)}')
         return BTUnion(lhs, self)
 
     # products - tuples - *
@@ -245,7 +245,7 @@ class BType(BTypeRoot):
         if isinstance(rhs, type):
             rhs = getBTypeForClass(rhs)
         elif not isinstance(rhs, BType):
-            raise TypeError(f'rhs should be a BType or type - got {repr(rhs)}')
+            raise BTypeError(f'rhs should be a BType or type - got {repr(rhs)}')
         types = \
             (self.types if isinstance(self, BTTuple) else (self,)) + \
             (rhs.types if isinstance(rhs, BTTuple) else (rhs,))
@@ -255,7 +255,7 @@ class BType(BTypeRoot):
         if isinstance(lhs, type):
             lhs = getBTypeForClass(lhs)
         elif not isinstance(lhs, BType):
-            raise TypeError(f'lhs should be a BType or type - got {repr(lhs)}')
+            raise BTypeError(f'lhs should be a BType or type - got {repr(lhs)}')
         types = \
             (lhs.types if isinstance(lhs, BTTuple) else (lhs,)) + \
             (self.types if isinstance(self, BTTuple) else (self,))
@@ -266,8 +266,8 @@ class BType(BTypeRoot):
         if isinstance(rhs, type):
             rhs = getBTypeForClass(rhs)
         elif not isinstance(rhs, BType):
-            raise TypeError(f'rhs should be a BType or type - got {repr(rhs)}')
-        if rhs in BType._arrayOrdinalTypes: raise TypeError(f'rhs must not be an ordinal type')
+            raise BTypeError(f'rhs should be a BType or type - got {repr(rhs)}')
+        if rhs in BType._arrayOrdinalTypes: raise BTypeError(f'rhs must not be an ordinal type')
         if self in BType._arrayOrdinalTypes:
             return BTSeq(rhs)
         else:
@@ -277,8 +277,8 @@ class BType(BTypeRoot):
         if isinstance(lhs, type):
             lhs = getBTypeForClass(lhs)
         elif not isinstance(lhs, BType):
-            raise TypeError(f'lhs should be a BType or type - got {repr(lhs)} - has a type been overridden?')
-        if self in BType._arrayOrdinalTypes: raise TypeError(f'rhs must not be an ordinal type')
+            raise BTypeError(f'lhs should be a BType or type - got {repr(lhs)} - has a type been overridden?')
+        if self in BType._arrayOrdinalTypes: raise BTypeError(f'rhs must not be an ordinal type')
         if lhs in BType._arrayOrdinalTypes:
             return BTSeq(self)
         else:
@@ -289,7 +289,7 @@ class BType(BTypeRoot):
         if isinstance(rhs, type):
             rhs = getBTypeForClass(rhs)
         elif not isinstance(rhs, BType):
-            raise TypeError(f'rhs should be a BType or type - got {repr(rhs)}')
+            raise BTypeError(f'rhs should be a BType or type - got {repr(rhs)}')
         return BTFn(self if isinstance(self, BTTuple) else BTTuple(self), rhs)
 
     def __rxor__(self, lhs):        # lhs ^ type
@@ -305,7 +305,7 @@ class BType(BTypeRoot):
         elif isinstance(lhs, generator):
             tArgs = tuple(lhs)
         else:
-            raise TypeError(f'lhs should be a BType, type, list or tuple - got {repr(lhs)}')
+            raise BTypeError(f'lhs should be a BType, type, list or tuple - got {repr(lhs)}')
         return BTFn(tArgs, self)
 
     # intersections - &
@@ -313,7 +313,7 @@ class BType(BTypeRoot):
         if isinstance(rhs, type):
             rhs = getBTypeForClass(rhs)
         elif not isinstance(rhs, BType):
-            raise TypeError(f'rhs should be a BType or type - got {repr(rhs)}')
+            raise BTypeError(f'rhs should be a BType or type - got {repr(rhs)}')
         if self.__class__ is BTFn:
             return BTOverload(self, rhs)
         else:
@@ -323,7 +323,7 @@ class BType(BTypeRoot):
         if isinstance(lhs, type):
             lhs = getBTypeForClass(lhs)
         elif not isinstance(lhs, BType):
-            raise TypeError(f'lhs should be a BType or type - got {repr(lhs)}')
+            raise BTypeError(f'lhs should be a BType or type - got {repr(lhs)}')
         if self.__class__ is BTFn:
             return BTOverload(lhs, self)
         else:
@@ -333,7 +333,7 @@ class BType(BTypeRoot):
     def __getitem__(self, rhs):     # type[rhs]
         if isinstance(rhs, int):
             # get's called by dict_keys | btype
-            raise TypeError('perhaps dict_keys | btype?')
+            raise BTypeError('perhaps dict_keys | btype?')
         if isinstance(rhs, tuple):
             return BTIntersection(self, *rhs)
         elif isinstance(rhs, str):
@@ -407,7 +407,7 @@ class BType(BTypeRoot):
 
 
 def raiseCantNameBTypeError(this, name, other):
-    raise TypeError(
+    raise BTypeError(
         f"Can't name new type ({type(this)}) as '{name}' as another BType({type(other)}) already has that name"
     )
 
@@ -416,7 +416,7 @@ class BTNom(BType):
 
     def __new__(cls, name):
         bt = sys._sharedKernel.tm.fromName(name)
-        if sys._sharedKernel.tm.bmetatypeid(bt) != bmtnom: raise TypeError(f'Unknown BTNom "{name}"')
+        if sys._sharedKernel.tm.bmetatypeid(bt) != bmtnom: raise BTypeError(f'Unknown BTNom "{name}"')
         return _BTypeById[bt.id]
 
     @classmethod
@@ -430,11 +430,11 @@ class BTNom(BType):
         # creates a new type with the provided name if it does not already exist
         try:
             bt = sys._sharedKernel.tm.fromName(name)
-            if sys._sharedKernel.tm.bmetatypeid(bt) != bmtnom: TypeError(f'"{name}" is already used by another type')
+            if sys._sharedKernel.tm.bmetatypeid(bt) != bmtnom: raise BTypeError(f'"{name}" is already used by another type')
             if name in ('i32', 'litint'):
                 cls._define(bt).nameAs(name)
             return _BTypeById[bt.id]
-        except TypeError:
+        except BTypeError:
             bt = sys._sharedKernel.tm.nominal(name)
             instance = cls._define(bt).nameAs(name)
             return instance
@@ -450,7 +450,7 @@ class BTSchemaVariable(BTNom):
 
     def __new__(cls, name):
         bt = sys._sharedKernel.tm.fromName(name)
-        if sys._sharedKernel.tm.bmetatypeid(bt) != bmtsvr: raise TypeError(f'Unknown BTSchemaVariable "{name}"')
+        if sys._sharedKernel.tm.bmetatypeid(bt) != bmtsvr: raise BTypeError(f'Unknown BTSchemaVariable "{name}"')
         return _BTypeById[bt.id]
 
     @classmethod
@@ -532,7 +532,7 @@ class BTIntersection(_BTSetOp):
             if isinstance(types[0], BTFn):
                 for t in types:
                     if not isinstance(types[0], BTFn):
-                        raise TypeError("Only BTFns allow in an overload")
+                        raise BTypeError("Only BTFns allow in an overload")
             bt = sys._sharedKernel.tm.intersection(*types)
             instance = super()._define(bt)
             instance.types = types
@@ -582,7 +582,7 @@ class BTOverload(BTIntersection):
 
 
 
-class _Flags(object):
+class _Flags:
     def __init__(self):
         self.hasActualT = False
         self.hasT = False
@@ -621,7 +621,7 @@ def _sortedUnionTypes(types):
                     collated.append(e)
                     _updateFlagsForUnion(t, flags)
                 else:
-                    raise TypeError()
+                    raise BTypeError("OPEN: Needs description")
     collated.sort(key=_typeId)
     compacted = [collated[0]]                  # add the first
     for i in range(1, len(collated)):       # from the second to the last, if each is different to the prior add it
@@ -665,7 +665,7 @@ def _sortedIntersectionTypes(types, singleSV):
                     collated.append(e)
                     _updateFlagsForIntersection(t, flags, singleSV)
                 else:
-                    raise TypeError()
+                    raise BTypeError("OPEN: Needs description")
     collated.sort(key=lambda t: t.id if isinstance(t, BType) else hash(t))
     compacted = [collated[0]]  # add the first
     for i in range(1, len(collated)):  # from the second to the last, if each is different to the prior add it
@@ -677,44 +677,44 @@ def _updateFlagsForIntersection(t, flags, singleSV):
     if isinstance(t, BType):
         if isT(t):
             if flags.hasActualT and singleSV:
-                raise TypeError('Can only have one actual T in an intersection')
+                raise BTypeError('Can only have one actual T in an intersection')
             flags.hasActualT = True
             flags.hasT = True
         elif t.hasT:
             flags.hasT = True
         if t.orthogonal:
             if (flags.orthogonal and flags.orthogonal is not t) and singleSV:
-                raise TypeError('Can only have one orthogonal type in an intersection')
+                raise BTypeError('Can only have one orthogonal type in an intersection')
             flags.orthogonal = t
     else:
         # all python types are orthogonal
         if (flags.orthogonal and flags.orthogonal is not t) and singleSV:
-            raise TypeError('Can only have one orthogonal in an intersection')
+            raise BTypeError('Can only have one orthogonal in an intersection')
         flags.orthogonal = t
 
 
-class _AddStuff(object):
+class _AddStuff:
     def __init__(self, t):
         self.t = t
     def __ror__(self, instance):    # instance | type
         return instance | BTIntersection(instance._t if hasattr(instance, '_t') else builtins.type(instance), self.t)
 
-class _SubtractStuff(object):
+class _SubtractStuff:
     def __init__(self, t):
         self.t = t
     def __ror__(self, instance):  # instance | type
         if not isinstance(t := instance._t if hasattr(instance, '_t') else builtins.type(instance), BTIntersection):
-            raise TypeError(f'Can only subtract a type from an intersection but LHS type is {t}')
-        a_, ab, b_, weakenings = _partition(
+            raise BTypeError(f'Can only subtract a type from an intersection but LHS type is {t}')
+        a_, ab, b_, weakenings = _partitionIntersectionTLs(
             t.types,
             self.t.types if isinstance(self.t, BTIntersection) else (self.t, )
         )
         if b_:
-            raise TypeError(f"RHS is trying to subtract {b_} which isn't in the LHS")
+            raise BTypeError(f"RHS is trying to subtract {b_} which isn't in the LHS")
         if not ab:
             raise ProgrammerError(f"Can't end up subtracting nothing")
         if not a_:
-            raise TypeError("Left with null set")
+            raise BTypeError("Left with null set")
         return instance | (a_[0] if len(a_) == 1 else BTIntersection(*a_))
 
 
@@ -767,13 +767,13 @@ class BTStruct(BType):
                 types = tuple(args[1])
                 typeByName = dict(zip(names, types))
             else:
-                raise TypeError('Unhandled case')
+                raise BTypeError('Unhandled case')
         else:
             names = tuple(kwargs.keys())
             types = tuple(kwargs.values())
             typeByName = kwargs
         if len(names) != len(types):
-            raise TypeError('names and tyoes must be of same length')
+            raise BTypeError('names and tyoes must be of same length')
         if (instance := cls._BTStructByTypes.get((names, types), Missing)) is Missing:
             bt = sys._sharedKernel.tm.struct(names, types)
             instance = super()._define(bt)
@@ -900,7 +900,6 @@ def weaken(srcTs, targetTs):
                 current += (targetT,)
         _weakenings[srcT] = current
 
-_ = Missing
 
 _fitsCache = {}
 
@@ -925,7 +924,7 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
         if isinstance(a, BTFn) and isinstance(b, BTFn):
             fittingSigs = True
         if not fittingSigs:
-            raise TypeError(f'LHS type ({a}) is polymorphic and thus cannot match RHS type {b}')
+            raise BTypeError(f'LHS type ({a}) is polymorphic and thus cannot match RHS type {b}')
 
     distance = 0
 
@@ -933,20 +932,18 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
         if a.__class__ == BTIntersection:
             # (txt & ISIN) fitsWithin (txt) etc
             cacheId = (a.id, b)
-
-
         else:
             # buildins.str fitsWithin buildins.str
-            return (_, a == b, _, distance)
+            return (Missing, a == b, Missing, distance)
     else:
         if isinstance(a, BType):
             if a.id == b.id:
                 # num fitsWithin num
-                return (_, True, _, distance)
+                return (Missing, True, Missing, distance)
             cacheId = (a.id, b.id)
         else:
             if not isinstance(a, type):
-                raise TypeError(f"a is type {a.__class__} b is {repr(b)}")
+                raise BTypeError(f"a is type {a.__class__} b is {repr(b)}")
             cacheId = (a, b.id)
 
 
@@ -954,20 +951,20 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
     cached = _fitsCache.get(cacheId, Missing)
     if cached is not Missing:
         doesFit, tByT, distance = cached
-        return (_, doesFit, tByT, distance)
+        return (Missing, doesFit, tByT, distance)
 
     tByT = {}
 
     if isinstance(b, BTSchemaVariable):
         # anything (except explicits) fitsWithin a wildcard
         if (hasattr(a, 'explicit') and a.explicit) or (a.__class__ == BTIntersection and _anyExplicit(a.types)):
-            return (cacheId, False, _, _)
+            return (cacheId, False, Missing, Missing)
         else:
             return (cacheId, True, {b:a}, distance + SCHEMA_PENALTY)  # exact match must beat wildcard
         # if b.base is T:
         #     # anything (except explicits) fitsWithin a wildcard
         #     if (hasattr(a, 'explicit') and a.explicit) or (a.__class__ == BTIntersection and _anyExplicit(a.types)):
-        #         return (cacheId, False, _, _)
+        #         return (cacheId, False, Missing, Missing)
         #     else:
         #         return (cacheId, True, {b:a}, distance + SCHEMA_PENALTY)  # exact match must beat wildcard
         # elif isinstance(a, BTSchemaVariable):
@@ -975,9 +972,9 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
         #         # N1 fitsWithin Na
         #         return (cacheId, True, tByT, distance)
         #     else:
-        #         return (cacheId, False, _, _)
+        #         return (cacheId, False, Missing, Missing)
         # else:
-        #     return (cacheId, False, _, _)
+        #     return (cacheId, False, Missing, Missing)
 
 
     # check the coercions
@@ -1008,7 +1005,7 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
         if isinstance(a, BTUnion):          # U I
             # if an element in a is b we have a partial fit
             # (num&fred) + (str&joe)  fitsWithin  (num&fred)
-            return (cacheId, False, _, _)
+            return (cacheId, False, Missing, Missing)
         elif a.__class__ == BTIntersection: # I I
             # (matrix & square & dtup) fitsWithin (matrix & dtup & aliased)
             case = I_I
@@ -1023,7 +1020,7 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
             # and    (index & square) + (index & circle)  fitsWithin  (index)
             for t in a.types:
                 doesFit, local_tByT, distance = cacheAndUpdate(fitsWithin(t, b, TRACE, fittingSigs), dict(tByT), distance)
-                if not doesFit: return (cacheId, False, _, _)
+                if not doesFit: return (cacheId, False, Missing, Missing)
             return (cacheId, True, tByT, distance)
         elif a.__class__ == BTIntersection: # I O
             case = I_O
@@ -1038,7 +1035,7 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
         # every a must fit in b
         for t in a.types:
             doesFit, tByT, distance = cacheAndUpdate(fitsWithin(t, b, TRACE, fittingSigs), tByT, distance)
-            if not doesFit: return (cacheId, False, _, _)
+            if not doesFit: return (cacheId, False, Missing, Missing)
         return (cacheId, True, tByT, distance)
 
     elif case == O_U:
@@ -1046,18 +1043,18 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
         for t in b.types:
             doesFit, tByT, distance = cacheAndUpdate(fitsWithin(a, t, TRACE, fittingSigs), tByT, distance)
             if doesFit: return (cacheId, True, tByT, distance)
-        return (cacheId, False, _, distance)
+        return (cacheId, False, Missing, distance)
 
     elif case == I_U:
         # two cases
-        # 1 - intersection is a union member - (num&fred) nfitsWithin  (num&fred) + (str&joe)
+        # 1 - intersection is a union member - (num&fred)  fitsWithin  (num&fred) + (str&joe)
         for t in b.types:
             doesFit, tByT, distance = cacheAndUpdate(fitsWithin(a, t, TRACE, fittingSigs), tByT, distance)
             if doesFit: return (cacheId, True, tByT, distance)
         # 2 - intersecting the union with another type - (num+str) & fred  fitsWithin  (num+str)
-        a_, ab, b_, weakenings = _partition(a.types, (b,))
+        a_, ab, b_, weakenings = _partitionIntersectionTLs(a.types, (b,))
         if _anyNotImplicit(b_):  # check for (matrix) fitsWithin (matrix & aliased) etc
-            return (cacheId, False, _, _)  # i.e. there is something missing in a that is required by b
+            return (cacheId, False, Missing, Missing)  # i.e. there is something missing in a that is required by b
         if len(a_) == 0:                          # exact match is always fine
             raise PathNotTested()
             return (cacheId, True, tByT, 0 + len(weakenings))
@@ -1074,10 +1071,10 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
                 # potentially out of order - e.g. ((N ** ccy) & list) fitsWithIn (T2 & (N ** T1))
                 # N log N process? as cross matching is required and need to choose shortest distance for T1, T2 etc
 
-                a_, ab, b_ = _partitionWithT(a.types, bTypes, TRACE, fittingSigs)
+                a_, ab, b_ = _partitionIntersectionTLsWithTInRhs(a.types, bTypes, TRACE, fittingSigs)
                 if b_:
                     if _anyNotImplicit(b_):  # check for (matrix) fitsWithin (matrix & aliased) etc
-                        return (cacheId, False, _, _)  # i.e. there is something missing in a that is required by b
+                        return (cacheId, False, Missing, Missing)  # i.e. there is something missing in a that is required by b
                     raise PathNotTested()
                 # check no conflicts for any T
                 for ta, tb, tByT_, distance_ in ab:
@@ -1091,12 +1088,12 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
                                     tByT[TNew] = tNew
                                 else:
                                     raise PathNotTested()
-                                    return (cacheId, False, _, _)   # conflict found
+                                    return (cacheId, False, Missing, Missing)   # conflict found
                         else:
                             tByT[TNew] = tNew
                 if len(a_) == 0:  # exact match is always fine
                     if len(Ts) ==1:
-                        return (cacheId, False, _, _)
+                        return (cacheId, False, Missing, Missing)
                     return (cacheId, True, tByT, distance)
                 else:
                     if len(Ts) == 0:
@@ -1111,21 +1108,21 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
 
             else: # len(Ts) == 1:
                 # (str & ISIN) >> check >> fitsWithin >> (str & T1)
-                a_, ab, b_, weakenings = _partition(a.types, bTypes)
+                a_, ab, b_, weakenings = _partitionIntersectionTLs(a.types, bTypes)
                 if b_:
                     if _anyNotImplicit(b_):  # check for (matrix) fitsWithin (matrix & aliased) etc
-                        return (cacheId, False, _, _)  # i.e. there is something missing in a that is required by b
+                        return (cacheId, False, Missing, Missing)  # i.e. there is something missing in a that is required by b
                 if len(a_) == 0:
                     # (str & ISIN) >> check >> fitsWithin >> (str & ISIN & T) - T is nullset - not fine
-                    return (cacheId, False, _, _)  # i.e. there is something missing in a that is required by b
+                    return (cacheId, False, Missing, Missing)  # i.e. there is something missing in a that is required by b
                 else:
                     # wildcard match is fine, metric is SCHEMA_PENALTY to loose against exact match
                     matchedT = a_[0] if len(a_) == 1 else BTIntersection(*a_)
                     return (cacheId, True, {Ts[0]: matchedT}, SCHEMA_PENALTY + len(weakenings) + len(a_))
         else:
-            a_, ab, b_, weakenings = _partition(a.types, b.types)
+            a_, ab, b_, weakenings = _partitionIntersectionTLs(a.types, b.types)
             if _anyNotImplicit(b_):         # check for (matrix) fitsWithin (matrix & aliased) etc
-                return (cacheId, False, _, _)   # i.e. there is something missing in a that is required by b
+                return (cacheId, False, Missing, Missing)   # i.e. there is something missing in a that is required by b
             if len(a_) == 0:                          # exact match is always fine
                 return (cacheId, True, tByT, 0 + len(weakenings))
             else:
@@ -1134,9 +1131,9 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
     elif case == I_O:
         # isT(b) has already been handled above in the BTSchemaVariable check
         # (num & col) fitsWithin (num)
-        a_, ab, b_, weakenings = _partition(a.types, (b,))
+        a_, ab, b_, weakenings = _partitionIntersectionTLs(a.types, (b,))
         if _anyNotImplicit(b_):  # check for (matrix) fitsWithin (matrix & aliased) etc
-            return (cacheId, False, _, _)  # i.e. there is something missing in a that is required by b
+            return (cacheId, False, Missing, Missing)  # i.e. there is something missing in a that is required by b
         if len(a_) == 0:                          # exact match is always fine
             return (cacheId, True, tByT, 0 + len(weakenings))
         else:
@@ -1146,22 +1143,22 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
         # str fitsWithin (str&aliased)    (remember aliased is implicit)
         if b.hasT:
             # MUSTDO handle wildcards properly
-            a_, ab, b_, weakenings = _partition((a,), b.types)
+            a_, ab, b_, weakenings = _partitionIntersectionTLs((a,), b.types)
             if b_:
                 if len(b_) == 1 and isT(b_[0]) and len(a_) > 0:
                     # wildcard match is always fine, metric is SCHEMA_PENALTY to loose against exact match
                     matchedT = a_[0] if len(a_) == 1 else BTIntersection(*a_)
                     return (cacheId, True, {b_[0]: matchedT}, SCHEMA_PENALTY + len(weakenings) + len(a_))
                 if _anyNotImplicit(b_):  # check for (matrix) fitsWithin (matrix & aliased) etc
-                    return (cacheId, False, _, _)  # i.e. there is something missing in a that is required by b
+                    return (cacheId, False, Missing, Missing)  # i.e. there is something missing in a that is required by b
             if len(a_) == 0:                          # exact match is always fine
                 return (cacheId, True, tByT, 0 + len(weakenings))
             else:
                 return _processA_(a_, cacheId, tByT, len(weakenings) + len(a_))
         else:
-            a_, ab, b_, weakenings = _partition((a,), b.types)
+            a_, ab, b_, weakenings = _partitionIntersectionTLs((a,), b.types)
             if _anyNotImplicit(b_):  # check for (matrix) fitsWithin (matrix & aliased) etc
-                return (cacheId, False, _, _)  # i.e. there is something missing in a that is required by b
+                return (cacheId, False, Missing, Missing)  # i.e. there is something missing in a that is required by b
             if len(a_) == 0:                          # exact match is always fine
                 return (cacheId, True, tByT, 0 + len(weakenings))
             else:
@@ -1174,7 +1171,7 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
     if isinstance(a, BTFn):
         if isinstance(b, BTFn):
             if a.numargs != b.numargs:
-                return (cacheId, False, _, _)
+                return (cacheId, False, Missing, Missing)
 
             # we have agreed to handle b and we are checking if a is up to the task of being substitutable with b
             # i.e. is a <: b
@@ -1191,7 +1188,7 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
                 doesFit, tByT, distance = cacheAndUpdate(fitsWithin(a.tRet, b.tRet, TRACE, fittingSigs), tByT, distance)
             if not doesFit:
                 # print(f'{a} <: {b} is false')
-                return (cacheId, False, _, _)
+                return (cacheId, False, Missing, Missing)
 
             for aT, bT in zip(a.tArgs, b.tArgs):
                 if isinstance(bT, BTSchemaVariable):
@@ -1203,7 +1200,7 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
                     doesFit, tByT, distance = cacheAndUpdate(fitsWithin(bT, aT, TRACE, fittingSigs), tByT, distance)
                 if not doesFit:
                     # print(f'{a} <: {b} is false')
-                    return (cacheId, False, _, _)
+                    return (cacheId, False, Missing, Missing)
 
             # there may be additional checks here
             # print(f'{a} <: {b} is true')
@@ -1211,10 +1208,10 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
 
         elif isinstance(a, BTOverload):
             # we don't do soft typing in coppertop
-            return (cacheId, False, _, _)
+            return (cacheId, False, Missing, Missing)
 
         else:
-            return (cacheId, False, _, _)
+            return (cacheId, False, Missing, Missing)
 
     elif isinstance(a, BTOverload):
         if isinstance(b, BTFn):
@@ -1225,59 +1222,59 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
             if doesFit:
                 return (cacheId, True, tByT, distance)
             else:
-                return (cacheId, False, _, _)
+                return (cacheId, False, Missing, Missing)
 
         elif isinstance(b, BTOverload):
             # a must fit with every one of b
             for bT in b.types:
                 doesFit, local_tByT, distance = cacheAndUpdate(fitsWithin(a, bT, TRACE, fittingSigs), dict(tByT), distance)
-                if not doesFit: return (cacheId, False, _, _)
+                if not doesFit: return (cacheId, False, Missing, Missing)
             return (cacheId, True, tByT, distance)
 
         else:
-            return (cacheId, False, _, _)
+            return (cacheId, False, Missing, Missing)
 
     elif type(a) is not type(b):
         # the two types are not the same so they cannot fit (we don't allow inheritance - except in case of Ordinals)
         if a in BType._arrayOrdinalTypes and b in BType._arrayOrdinalTypes:
             return (cacheId, True, tByT, distance)
         else:
-            return (cacheId, False, _, _)
+            return (cacheId, False, Missing, Missing)
 
     elif isinstance(b, BTNom):
         # already a.id != b.id so must be False
-        return (cacheId, False, _, _)
+        return (cacheId, False, Missing, Missing)
 
     elif isinstance(b, BTTuple):
         aTs, bTs = a.types, b.types
-        if len(aTs) != len(bTs): return (cacheId, False, _, _)
+        if len(aTs) != len(bTs): return (cacheId, False, Missing, Missing)
         for i, aT in enumerate(aTs):
             doesFit, tByT, distance = cacheAndUpdate(fitsWithin(aT, bTs[i], TRACE, fittingSigs), tByT, distance)
-            if not doesFit: return (cacheId, False, _, _)
+            if not doesFit: return (cacheId, False, Missing, Missing)
         return (cacheId, True, tByT, distance)
 
     elif isinstance(b, BTStruct):
         # b defines what is required, a defines what is available
         # iterate through b's names and check if they are available in a
         aF2T, bF2T = a.typeByName, b.typeByName
-        if len(aF2T) < len(bF2T): return (cacheId, False, _, _)
+        if len(aF2T) < len(bF2T): return (cacheId, False, Missing, Missing)
         for bf, bT in bF2T.items():
             aT = aF2T.get(bf, Missing)
-            if aT is Missing: return (cacheId, False, _, _)
+            if aT is Missing: return (cacheId, False, Missing, Missing)
             doesFit, tByT, distance = cacheAndUpdate(fitsWithin(aT, bT, TRACE, fittingSigs), tByT, distance)
-            if not doesFit: return (cacheId, False, _, _)
+            if not doesFit: return (cacheId, False, Missing, Missing)
         return (cacheId, True, tByT, distance)
 
     elif isinstance(b, BTSeq):
         doesFit2, tByT, distance = cacheAndUpdate(fitsWithin(a.mappedType, b.mappedType, TRACE, fittingSigs), tByT, distance)
-        if not doesFit2: return (cacheId, False, _, _)
+        if not doesFit2: return (cacheId, False, Missing, Missing)
         return (cacheId, True, tByT, distance)
 
     elif isinstance(b, BTMap):
         doesFit1, tByT, distance = cacheAndUpdate(fitsWithin(a.indexType, b.indexType, TRACE, fittingSigs), tByT, distance)
-        if not doesFit1: return (cacheId, False, _, _)
+        if not doesFit1: return (cacheId, False, Missing, Missing)
         doesFit2, tByT, distance = cacheAndUpdate(fitsWithin(a.mappedType, b.mappedType, TRACE, fittingSigs), tByT, distance)
-        if not doesFit2: return (cacheId, False, _, _)
+        if not doesFit2: return (cacheId, False, Missing, Missing)
         return (cacheId, True, tByT, distance)
 
     else:
@@ -1316,15 +1313,15 @@ def _processA_(a_, cacheId, tByT, lenWeakenings):
             if ta.familial:
                 implicitWeakenings = [tw for tw in _weakenings.get(ta, ()) if tw in _implicitTypes]
                 if not implicitWeakenings:
-                    return (cacheId, False, _, _)
+                    return (cacheId, False, Missing, Missing)
             elif ta.explicit:
-                return (cacheId, False, _, _)
+                return (cacheId, False, Missing, Missing)
             elif ta.orthogonal:
                 exclusiveCount += 1
         else:
             exclusiveCount += 1
     if exclusiveCount > 1:
-        raise TypeError()
+        raise BTypeError("OPEN: Needs description")
     return (cacheId, True, tByT, len(a_) + lenWeakenings)
 
 
@@ -1359,46 +1356,10 @@ def cacheAndUpdate(result, tByT, distance=Missing):
             tByT.update(updates)
     return doesFit, tByT, distance
 
-def _partitionWithT(a:tuple, b:tuple, TRACE=False, fittingSigs=False):
-    ab = []
-    potentialsByA, potentialsByB = {}, {}
-    remainingATypes = list(a)
-    remainingBTypes = list(b)
-    for ai, ta in enumerate(remainingATypes):
-        for bi, tb in enumerate(remainingBTypes):
-            doesFit, tByT, distance = cacheAndUpdate(fitsWithin(ta, tb, TRACE, fittingSigs), {}, 0)  # handles weakenings
-            if doesFit:
-                if distance == 0:
-                    ab.append((ta, tb, tByT, 0))
-                    remainingATypes[ai] = Missing
-                    del remainingBTypes[bi]
-                    break
-                else:
-                    potentialsByA.setdefault(ta, []).append((tb, tByT, distance))
-                    potentialsByB.setdefault(tb, []).append((ta, tByT, distance))
-    # if any bt fits more than one a we might have a problem
-    # but for the moment just check that each potential A and B has length 1
-    a_ = {at:at for at in remainingATypes if at is not Missing}
-    b_ = {bt:bt for bt in remainingBTypes}
-    for ta, potentials in potentialsByA.items():
-        if len(potentials) > 1:
-            raise NotYetImplemented()
-        else:
-            tb, tByT, distance = potentials[0]
-            ab.append((ta, tb, tByT, distance))
-            del a_[ta]
-    for tb, potentials in potentialsByB.items():
-        if len(potentials) > 1:
-            raise NotYetImplemented()
-        else:
-            del b_[tb]
-    return tuple(a_.values()), tuple(ab), tuple(b_.values())
 
-
-def _partition(A:tuple, B:tuple):
-    # B intersect A' - stuff in B but not in A - anything here then it's not a fit
-    # B intersect A - common stuff, if we only have common stuff then it's an exact fit
-    # B' intersect A - stuff in A but not in B - we term this the residual
+def _partitionIntersectionTLs(A:tuple, B:tuple):
+    # A and B are the types of two intersections, answer the types in A but not B, in both and in B but not A
+    # handles weakenings
     iA, iB = 0, 0
     nA, nB = len(A), len(B)
     nAB = min(nA, nB)
@@ -1464,6 +1425,42 @@ def _partition(A:tuple, B:tuple):
 
     # answer  AB', AB, A'B
     return outA, outAB, outB, weakenings
+
+
+def _partitionIntersectionTLsWithTInRhs(a:tuple, b:tuple, TRACE=False, fittingSigs=False):
+    ab = []
+    potentialsByA, potentialsByB = {}, {}
+    remainingATypes = list(a)
+    remainingBTypes = list(b)
+    for ai, ta in enumerate(remainingATypes):
+        for bi, tb in enumerate(remainingBTypes):
+            doesFit, tByT, distance = cacheAndUpdate(fitsWithin(ta, tb, TRACE, fittingSigs), {}, 0)  # handles weakenings
+            if doesFit:
+                if distance == 0:
+                    ab.append((ta, tb, tByT, 0))
+                    remainingATypes[ai] = Missing
+                    del remainingBTypes[bi]
+                    break
+                else:
+                    potentialsByA.setdefault(ta, []).append((tb, tByT, distance))
+                    potentialsByB.setdefault(tb, []).append((ta, tByT, distance))
+    # if any bt fits more than one a we might have a problem
+    # but for the moment just check that each potential A and B has length 1
+    a_ = {at:at for at in remainingATypes if at is not Missing}
+    b_ = {bt:bt for bt in remainingBTypes}
+    for ta, potentials in potentialsByA.items():
+        if len(potentials) > 1:
+            raise NotYetImplemented()
+        else:
+            tb, tByT, distance = potentials[0]
+            ab.append((ta, tb, tByT, distance))
+            del a_[ta]
+    for tb, potentials in potentialsByB.items():
+        if len(potentials) > 1:
+            raise NotYetImplemented()
+        else:
+            del b_[tb]
+    return tuple(a_.values()), tuple(ab), tuple(b_.values())
 
 
 def hasT(t):

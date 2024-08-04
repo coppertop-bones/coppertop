@@ -35,7 +35,7 @@ ROOT_NAME = "<root>"
 def _targetCount(p):
     return c_long.from_address(p._targetId).value
 
-class _CoWProxy(object):
+class _CoWProxy:
     __slots__ = ['_parentProxy', '_k', '_target', '_targetId']
 
     def __init__(self, parentProxy, k, target):
@@ -203,7 +203,7 @@ class _CoWProxy(object):
 # to decrease any ref count object deletion must be detected thus we need to create an object on access - this is
 # the cost of the optimisation in Python
 
-class _CoWScope(object):
+class _CoWScope:
     _slots__ = ['_vars', '_name']
 
     def __init__(self):
@@ -245,7 +245,7 @@ class _CoWScope(object):
 
 
 
-class _ContextualScopeManager(object):
+class _ContextualScopeManager:
     __slots__ = ['_current', '_namedScopes']
 
     def __init__(self):
@@ -279,7 +279,7 @@ class _ContextualScopeManager(object):
 
 
 
-class _MutableContextualScope(object):
+class _MutableContextualScope:
     _slots__ = ['_vars', '_parent', '_manager', '_name']
 
     def __init__(self, manager, parent, name=Missing):

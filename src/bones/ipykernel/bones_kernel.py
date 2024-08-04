@@ -62,7 +62,7 @@ def _newKernel():
     return k
 
 
-class BonesHandler(object):
+class BonesHandler:
 
     def __init__(self):
         self.bonesKernel = _newKernel()
@@ -152,7 +152,7 @@ class BonesHandler(object):
 
 
 
-class PythonHandler(object):
+class PythonHandler:
 
     def __init__(self):
         self._globals = {'_logger': _logger}
@@ -197,7 +197,7 @@ class PythonHandler(object):
 
 
 
-class GroupHandler(object):
+class GroupHandler:
 
     OK = 'OK'
     OK_SUPPRESS = 'OK_SUPPRESS'
@@ -517,7 +517,7 @@ def logTo(logger, level):
     return actual
 
 
-class _Dummy(object):pass
+class _Dummy:pass
 _logger = _Dummy()
 _logger.error = logTo(logging.getLogger(__name__), logging.ERROR)
 _logger.warn = logTo(logging.getLogger(__name__), logging.WARN)
