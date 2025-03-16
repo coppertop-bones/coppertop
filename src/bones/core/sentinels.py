@@ -11,7 +11,8 @@
 #
 # **********************************************************************************************************************
 
-import sys
+import sys, types, typing
+
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 
@@ -27,12 +28,33 @@ def _ensureSentinels():
 
     # something should / could be there but it is definitely not there
     if not hasattr(sys, '_Missing'):
+        # OPEN: add a metaclass
         class Missing:
             def __bool__(self):
                 return False
             def __repr__(self):
                 # for pretty display in pycharm debugger
                 return 'Missing'
+            def __or__(self, other):
+                # see https://peps.python.org/pep-0604/
+                if (
+                        isinstance(other, type) or
+                        (t := typing.get_origin(other) is typing.Union) or
+                        t is types.UnionType
+                ):
+                    return typing.Union[type(self), other]
+                else:
+                    return NotImplemented
+            def __ror__(self, other):
+                # see https://peps.python.org/pep-0604/
+                if (
+                        isinstance(other, type) or
+                        (t := typing.get_origin(other) is typing.Union) or
+                        t is types.UnionType
+                ):
+                    return typing.Union[type(self), other]
+                else:
+                    return NotImplemented
         sys._Missing = Missing()
         sys._Missing._t = sys._Missing
 
@@ -40,6 +62,8 @@ def _ensureSentinels():
     # the null set
     if not hasattr(sys, '_NULL'):
         class _NULL:
+            def __bool__(self):
+                return False
             def __repr__(self):
                 # for pretty display in pycharm debugger
                 return 'Null'
