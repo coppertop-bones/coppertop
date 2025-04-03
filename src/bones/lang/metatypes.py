@@ -12,25 +12,12 @@
 # **********************************************************************************************************************
 
 # BY DESIGN
-# 1) we allow aType['name'] as shorthand for aType[BTNom('_name')].nameAs('name')  - albeit at the slightly increased
+# 1) we allow aType['name'] as shorthand for aType[BTAtom('_name')].nameAs('name')  - albeit at the slightly increased
 #    chance of misspelling errors
 #
 # SPEED OPTIONS - SoA style on the list of types, etc - this may also make translation to C easier
 # classes with __slots__ seem to be the fastest
 # if accessing globals becomes an issue could make the whole module a class
-
-# BType
-#   |--- BTNom
-#   |        \--- BTSchemaVariable
-#   |--- _BTSetOp
-#   |        |--- BTUnion
-#   |        |--- BTIntersection
-#   |        \--- BTOverload
-#   |--- BTTuple
-#   |--- BTStruct
-#   |--- BTSeq
-#   |--- BTMap
-#   \--- BTFn
 
 
 import sys
@@ -40,12 +27,17 @@ if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 __all__ = ['BType', 'S']
 
 import itertools, builtins
-from bones.core.utils import raiseLess
-from bones.core.errors import ErrSite
+
+from bones.lang._type_lang.jones_type_manager import JonesTypeManager, BType, BTAtom, BTIntersection, BTUnion, \
+    BTTuple, BTStruct, BTSeq, BTMap, BTFn, BTSchemaVariable, BTOverload, BTypeError, ppT
+from bones.lang._type_lang.jones_type_manager import _btypeByClass, _BTypeById     # used by coppertop.pipe - do not remove
+from bones.lang.type_lang import TypeLangInterpreter
+
+from bones.lang.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, bmtsvr, bmtnameById
+
 from bones.core.errors import ProgrammerError, NotYetImplemented, PathNotTested
 from bones.core.sentinels import Missing, Void, generator
-from bones.core.context import context
-from bones.lang.utils import Constructors
+
 
 _verboseNames = False
 
@@ -54,356 +46,9 @@ _idSeed = itertools.count(start=1)   # reserve id 0 as a terminator of a type se
 REPL_OVERRIDE_MODE = False
 
 _BTypeByName = {}
-_BTypeById = [Missing] * 1000
-_aliases = {}                   # mappings from python types to bones types
 
 
-from bones import jones
-from bones.jones import BType as BTypeRoot, BTypeError
 
-if not hasattr(sys, '_sharedKernel'):
-    sys._sharedKernel = jones.Kernel()
-
-
-def getBTypeForClass(cls):
-    if (t := _aliases.get(cls, Missing)) is Missing:
-        name = cls.__module__ + "." + cls.__name__
-        t = BTNom.ensure(name)
-        _aliases[cls] = t
-    return t
-
-
-# OPEN: get these from the kernel.tm
-bmterr = 0
-bmtnom = 1
-bmtint = 2
-bmtuni = 3
-bmttup = 4
-bmtstr = 5
-bmtrec = 6
-bmtseq = 7
-bmtmap = 8
-bmtfnc = 9
-bmtsvr = 10
-
-
-class BType(BTypeRoot):
-    
-    _arrayOrdinalTypes = ()
-
-    __slots__ = ['familial', 'explicit', 'orthogonal', '_constructor', '_coercer', '_pp']
-
-    # TYPE CONSTRUCTION & NAMING
-
-    @classmethod
-    def _define(cls, bt):
-        assert cls is not BType
-        if bt.id == 0: raise BTypeError('id == 0')
-        if bt.id >= len(_BTypeById): _BTypeById.extend([Missing] * 1000)
-        instance = super().__new__(cls)
-        instance.id = bt.id
-        instance.familial = False
-        instance.explicit = False
-        instance.orthogonal = False     # can set to a group whose members when intersected return an uninhabited set
-        instance._constructor = Missing
-        instance._coercer = Missing
-        instance._pp = Missing
-        _BTypeById[bt.id] = instance
-        return instance
-    
-    @classmethod
-    def _new(cls):
-        return super().__new__(cls)
-
-    def __new__(cls, name):
-        # gets a type throwing an error if it has not already been defined
-        # super().__new__(cls)
-        bt = sys._sharedKernel.tm.fromName(name)
-        return _BTypeById[bt.id]
-
-    def __init__(self, *args, **kwargs):
-        # just here to prevent the superclasses init being called
-        pass
-
-    def __instancecheck__(self, x):
-        if hasattr(x, '_t'):
-            return x._t in self
-        return type(x) in self
-
-    @property
-    def hasT(self):
-        return sys._sharedKernel.tm.hasT(self)
-
-    @property
-    def name(self):
-        return sys._sharedKernel.tm.name(self)
-
-    def nameAs(self, name):
-        sys._sharedKernel.tm.nameAs(self, name)
-        return self
-
-    @property
-    def setFamilial(self):
-        self.familial = True
-        return self
-
-    @property
-    def setExplicit(self):
-        self.explicit = True
-        return self
-
-    def setOrthogonal(self, group):
-        if self.orthogonal and group is not self.orthogonal:
-            raise ProgrammerError(f'{self} has orthogonal already set to {self.orthogonal}')
-        self.orthogonal = group
-        return self
-
-    @property
-    def setImplicit(self):
-        global _implicitTypes
-        if self not in _implicitTypes:
-            _implicitTypes += (self,)
-        return self
-
-
-    # TYPE COERCION OF INSTANCES
-
-    def setCoercer(self, fnTV):
-        if self.hasT:
-            raise BTypeError(f'{self} has a T so cannot be an instance type')
-        if self._coercer is Missing:
-            self._coercer = fnTV
-        else:
-            if self._coercer is not fnTV:
-                # this helps protect from bugs however it's a pain in Jupyter as cells need to be recalculated
-                # and my windows machine is noticably slower than my M1 macbook
-                raise ProgrammerError('coercer already set')
-        return self
-
-    def __ror__(self, instance):        # instance | type   the case of type | type should be caught first below
-        if self.hasT:
-            raise BTypeError(f'{self} has a T so cannot be an instance type')
-        elif hasattr(instance, '_asT'):
-            # the instance has a coercion method
-            return instance._asT(self)
-        elif self._coercer:
-            # type has a coercer
-            return self._coercer(self, instance)
-        else:
-            msg = f'{instance} can\'t be coerced to <:{self}> - instance has no _asT, type has no _coercer'
-            raiseLess(BTypeError(msg, ErrSite(self.__class__)))
-
-
-    # INSTANCE CONSTRUCTION
-
-    def setConstructor(self, fnTV):
-        # COULDDO check that first arg of fnTV is t - I accidentally tried to use a bones type
-        # as a constructor and it was hard to diagnose the cause of the bug I was seeing
-        if self.hasT:
-            raise BTypeError(f'{self} has a T so cannot be an instance type')
-        if self._constructor is not Missing and fnTV is not self._constructor and not REPL_OVERRIDE_MODE:
-            raise ProgrammerError('constructor already set')
-        self._constructor = fnTV
-        return self
-
-    def __call__(self, *args, **kwargs):    # type(*args, **kwargs)
-        # create a new instance using the constructor
-        if self.hasT:
-            raise BTypeError(f'{self} has a T so cannot be an instance type')
-        if self._constructor:
-            if args and isinstance(args[0], Constructors):
-                cs = Constructors(args[0])
-                cs.append(self)
-                return self._constructor(cs, *args[1:], **kwargs)
-            else:
-                cs = Constructors()
-                cs.append(self)
-                return self._constructor(cs, *args, **kwargs)
-        else:
-            raise ProgrammerError(f'No constructor defined for type "{self}"')
-
-
-    # SET OPERATION BASED CONSTRUCTION OF TYPES
-
-    # unions - +
-    def __add__(self, rhs):         # type + rhs
-        if isinstance(rhs, type):
-            rhs = getBTypeForClass(rhs)
-        elif not isinstance(rhs, BType):
-            raise BTypeError(f'rhs should be a BType or type - got {repr(rhs)}')
-        return BTUnion(self, rhs)
-
-    def __radd__(self, lhs):        # lhs + type
-        if isinstance(lhs, type):
-            lhs = getBTypeForClass(lhs)
-        elif not isinstance(lhs, BType):
-            raise BTypeError(f'lhs should be a BType or type - got {repr(lhs)}')
-        return BTUnion(lhs, self)
-
-    # products - tuples - *
-    def __mul__(self, rhs):         # type * rhs
-        if isinstance(rhs, type):
-            rhs = getBTypeForClass(rhs)
-        elif not isinstance(rhs, BType):
-            raise BTypeError(f'rhs should be a BType or type - got {repr(rhs)}')
-        types = \
-            (self.types if isinstance(self, BTTuple) else (self,)) + \
-            (rhs.types if isinstance(rhs, BTTuple) else (rhs,))
-        return BTTuple(*types)
-
-    def __rmul__(self, lhs):        # lhs * type
-        if isinstance(lhs, type):
-            lhs = getBTypeForClass(lhs)
-        elif not isinstance(lhs, BType):
-            raise BTypeError(f'lhs should be a BType or type - got {repr(lhs)}')
-        types = \
-            (lhs.types if isinstance(lhs, BTTuple) else (lhs,)) + \
-            (self.types if isinstance(self, BTTuple) else (self,))
-        return BTTuple(*types)
-
-    # finite size exponentials - lists and maps - **
-    def __pow__(self, rhs):         # type ** rhs
-        if isinstance(rhs, type):
-            rhs = getBTypeForClass(rhs)
-        elif not isinstance(rhs, BType):
-            raise BTypeError(f'rhs should be a BType or type - got {repr(rhs)}')
-        if rhs in BType._arrayOrdinalTypes: raise BTypeError(f'rhs must not be an ordinal type')
-        if self in BType._arrayOrdinalTypes:
-            return BTSeq(rhs)
-        else:
-            return BTMap(self, rhs)
-
-    def __rpow__(self, lhs):        # lhs ** type
-        if isinstance(lhs, type):
-            lhs = getBTypeForClass(lhs)
-        elif not isinstance(lhs, BType):
-            raise BTypeError(f'lhs should be a BType or type - got {repr(lhs)} - has a type been overridden?')
-        if self in BType._arrayOrdinalTypes: raise BTypeError(f'rhs must not be an ordinal type')
-        if lhs in BType._arrayOrdinalTypes:
-            return BTSeq(self)
-        else:
-            return BTMap(lhs, self)
-
-    # general exponentials - functions - ^
-    def __xor__(self, rhs):         # type ^ rhs
-        if isinstance(rhs, type):
-            rhs = getBTypeForClass(rhs)
-        elif not isinstance(rhs, BType):
-            raise BTypeError(f'rhs should be a BType or type - got {repr(rhs)}')
-        return BTFn(self if isinstance(self, BTTuple) else BTTuple(self), rhs)
-
-    def __rxor__(self, lhs):        # lhs ^ type
-        if isinstance(lhs, BTTuple):
-            tArgs = lhs
-        elif isinstance(lhs, type):
-            lhs = getBTypeForClass(lhs)
-            tArgs = (lhs,)
-        elif isinstance(lhs, BType):
-            tArgs = (lhs,)
-        elif isinstance(lhs, (list, tuple)):
-            tArgs = lhs
-        elif isinstance(lhs, generator):
-            tArgs = tuple(lhs)
-        else:
-            raise BTypeError(f'lhs should be a BType, type, list or tuple - got {repr(lhs)}')
-        return BTFn(tArgs, self)
-
-    # intersections - &
-    def __and__(self, rhs):         # type & rhs
-        if isinstance(rhs, type):
-            rhs = getBTypeForClass(rhs)
-        elif not isinstance(rhs, BType):
-            raise BTypeError(f'rhs should be a BType or type - got {repr(rhs)}')
-        if self.__class__ is BTFn:
-            return BTOverload(self, rhs)
-        else:
-            return BTIntersection(self, rhs)
-
-    def __rand__(self, lhs):        # lhs & type
-        if isinstance(lhs, type):
-            lhs = getBTypeForClass(lhs)
-        elif not isinstance(lhs, BType):
-            raise BTypeError(f'lhs should be a BType or type - got {repr(lhs)}')
-        if self.__class__ is BTFn:
-            return BTOverload(lhs, self)
-        else:
-            return BTIntersection(lhs, self)
-
-    # intersection - []
-    def __getitem__(self, rhs):     # type[rhs]
-        if isinstance(rhs, int):
-            # get's called by dict_keys | btype
-            raise BTypeError('perhaps dict_keys | btype?')
-        if isinstance(rhs, tuple):
-            return BTIntersection(self, *rhs)
-        elif isinstance(rhs, str):
-            name = rhs
-            tag = BTNom.ensure(f'_{name}')         # checks that there is no name conflict
-            instance = BTIntersection(self, tag)
-            if instance.name is Missing or instance.name is None:
-                instance.nameAs(name)
-            else:
-                if instance.name != name:
-                    raise ProgrammerError()
-            return instance
-        else:
-            if self.__class__ is BTFn:
-                return BTOverload(self, rhs)
-            else:
-                return BTIntersection(self, rhs)
-
-    # intersection - +, -
-    def __pos__(self):              # +type
-        return _AddStuff(self)
-
-    def __neg__(self):              # -type
-        return _SubtractStuff(self)
-
-
-    # QUERYING
-
-    def __len__(self):
-        return 1            # all non-union types are a union of length 1
-
-    def __contains__(self, item):
-        return item == self
-
-    def __hash__(self):
-        return self.id
-
-    def __eq__(self, rhs):
-        return isinstance(rhs, self.__class__) and self.id == rhs.id
-
-
-    # DISPLAY
-
-    def setPP(self, pp):
-        self._pp = pp
-        return self
-
-    def __str__(self):
-        return self.__repr__()
-
-    def ppName(self):
-        if context.showFullType:
-            return Missing
-        else:
-            if a := self._pp:
-                return a, False, False
-            elif a := self.name:
-                return a, False, False
-
-    def ppT(self):
-        if a := self.ppName(): return a
-        return f'bt{self.id}', False, False
-
-    def __repr__(self):
-        pp, compound, hasCompound = self.ppT()
-        return pp
-
-    # # instance creation unwind
-    # def _killType(self, id):
-    #     _BTypeById[id] = Missing
 
 
 def raiseCantNameBTypeError(this, name, other):
@@ -412,235 +57,29 @@ def raiseCantNameBTypeError(this, name, other):
     )
 
 
-class BTNom(BType):
-
-    def __new__(cls, name):
-        bt = sys._sharedKernel.tm.fromName(name)
-        if sys._sharedKernel.tm.bmetatypeid(bt) != bmtnom: raise BTypeError(f'Unknown BTNom "{name}"')
-        return _BTypeById[bt.id]
-
-    @classmethod
-    def define(cls, name):
-        bt = sys._sharedKernel.tm.atom(name)
-        instance = cls._define(bt)
-        return instance
-
-    @classmethod
-    def ensure(cls, name):
-        # creates a new type with the provided name if it does not already exist
-        try:
-            bt = sys._sharedKernel.tm.fromName(name)
-            if sys._sharedKernel.tm.bmetatypeid(bt) != bmtnom: raise BTypeError(f'"{name}" is already used by another type')
-            if name in ('i32', 'litint'):
-                cls._define(bt).nameAs(name)
-            return _BTypeById[bt.id]
-        except BTypeError:
-            bt = sys._sharedKernel.tm.atom(name)
-            instance = cls._define(bt).nameAs(name)
-            return instance
-
-    def ppName(self):
-        # it looks like in C our Python subclass does not appear as an instance of PyBTypeCls
-        return sys._sharedKernel.tm.name(sys._sharedKernel.tm.fromId(self.id)), False, False
-
-
-
-class BTSchemaVariable(BTNom):
-    # T1, T2, etc - NB: the term schema means a model / schematic whereas the term scheme means a plan of action
-
-    def __new__(cls, name):
-        bt = sys._sharedKernel.tm.fromName(name)
-        if sys._sharedKernel.tm.bmetatypeid(bt) != bmtsvr: raise BTypeError(f'Unknown BTSchemaVariable "{name}"')
-        return _BTypeById[bt.id]
-
-    @classmethod
-    def define(cls, name):
-        bt = sys._sharedKernel.tm.schemavar(name)
-        instance = cls._define(bt)
-        return instance
-
-    @classmethod
-    def ensure(cls, name):
-        raise NotImplementedError('ensure is not allowed')
-
-
-
-class _BTSetOp(BType):
-    __slots__ = ['types']
-
-
-
-class BTUnion(_BTSetOp):
-    # union of two or more types
-    _typeByTypes = {}
-
-    def __new__(cls, *types):
-        if len(types) == 0:
-            raise ProgrammerError('No types provided')
-        if len(types) == 1: return types[0]
-        types, flags = _sortedUnionTypes(types)
-        if len(types) == 1:
-            return types[0]
-        if (instance := cls._typeByTypes.get(types, Missing)) is Missing:
-            bt = sys._sharedKernel.tm.union(*types)
-            instance = super()._define(bt)
-            instance.types = types
-            instance.familial = flags.familial
-            instance.explicit = flags.explicit
-            instance.orthogonal = flags.orthogonal
-            cls._typeByTypes[types] = instance
-        return instance
-
-    def __hash__(self):
-        return self.id  # see https://stackoverflow.com/questions/53518981/inheritance-hash-sets-to-none-in-a-subclass
-
-    def __eq__(self, rhs):
-        # we can be subclassed
-        return isinstance(rhs, BTUnion) and ((self.id == rhs.id) or (self.types == rhs.types))
-
-    def __len__(self):
-        return len(self.types)
-
-    def __contains__(self, item):
-        return item in self.types
-
-    def ppT(self):
-        if a := self.ppName(): return a
-        ts = []
-        hasCompound = False
-        for t in self.types:
-            pp, compound, childCompound = ppT(t)
-            ts.append(f'({pp})' if compound and childCompound else pp)
-            hasCompound = hasCompound or compound
-        return (' + ' if hasCompound else '+').join(ts), True, hasCompound
-
-
-
-class BTIntersection(_BTSetOp):
-    # intersection of two or more types
-    _typeByTypes = {}
-
-    def __new__(cls, *types):
-        if len(types) == 0:
-            raise ProgrammerError('No types provided')
-        if len(types) == 1:
-            return types[0]
-        types, flags = _sortedIntersectionTypes(types, cls is BTIntersection)
-        if len(types) == 1:
-            return types[0]
-        if (instance := cls._typeByTypes.get(types, Missing)) is Missing:
-            if isinstance(types[0], BTFn):
-                for t in types:
-                    if not isinstance(types[0], BTFn):
-                        raise BTypeError("Only BTFns allow in an overload")
-            bt = sys._sharedKernel.tm.intersection(*types)
-            instance = super()._define(bt)
-            instance.types = types
-            instance.orthogonal = flags.orthogonal
-            cls._typeByTypes[types] = instance
-        return instance
-
-    def __hash__(self):
-        return self.id  # see https://stackoverflow.com/questions/53518981/inheritance-hash-sets-to-none-in-a-subclass
-
-    def __eq__(self, rhs):
-        # we can be subclassed
-        return isinstance(rhs, BTIntersection) and ((self.id == rhs.id) or (self.types == rhs.types))
-
-    def __sub__(self, rhs):     # self - other
-        raise NotYetImplemented()
-
-    def __len__(self):
-        return len(self.types)
-
-    def __contains__(self, item):
-        return item in self.types
-
-    def ppT(self):
-        if a := self.ppName(): return a
-        ts = []
-        hasCompound = False
-        for t in self.types:
-            pp, compound, childCompound = ppT(t)
-            ts.append(f'({pp})' if compound else pp)
-            hasCompound = hasCompound or compound
-        return (' & ' if hasCompound else '&').join(ts), True, hasCompound
-
-
-
-class BTOverload(BTIntersection):
-
-    def ppT(self):
-        if a := self.ppName(): return a
-        ts = []
-        hasCompound = False
-        for t in self.types:
-            pp, compound, childCompound = ppT(t)
-            ts.append(f'({pp})' if compound and childCompound else pp)
-            hasCompound = hasCompound or compound
-        return ' & '.join(ts), True, hasCompound
+class BTReserved(BType):
+    def __new__(cls, name=Missing, explicit=Missing, space=Missing, implicitly=Missing):
+        kwargs = {}
+        if name: kwargs['name'] = name
+        if explicit: kwargs['explicit'] = explicit
+        if space: kwargs['space'] = space
+        if implicitly: kwargs['implicitly'] = implicitly
+        bt = sys._gtm.reserve(**kwargs)
+        return cls._new(bt)
 
 
 
 class _Flags:
-    __slots__ = ['hasActualT', 'hasT', 'familial', 'explicit', 'orthogonal']
+    __slots__ = ['hasActualT', 'hasT', 'explicit', 'orthogonal']
     def __init__(self):
         self.hasActualT = False
         self.hasT = False
-        self.familial = False
         self.explicit = False
         self.orthogonal = False
 
-
-def _sortedUnionTypes(types):
-    flags = _Flags()
-    if len(types) == 1:
-        _updateFlagsForUnion(types[0], flags)
-        return types
-    collated = []
-    for t in types:
-        if isinstance(t, BTUnion):            # BTUnion is a subclass of BType so this must come before BType
-            collated.extend(t.types)
-            [_updateFlagsForUnion(e, flags) for e in t.types]
-        elif isinstance(t, type):
-            t = getBTypeForClass(t)
-            collated.append(t)
-            _updateFlagsForUnion(t, flags)
-        elif isinstance(t, BType):
-            collated.append(t)
-            _updateFlagsForUnion(t, flags)
-        else:
-            for e in t:
-                if isinstance(e, BTUnion):    # BTUnion is a subclass of BType so this must come before BType
-                    collated.extend(e.types)
-                    [_updateFlagsForUnion(e, flags) for r in t.types]
-                elif isinstance(e, type):
-                    e = getBTypeForClass(e)
-                    collated.append(e)
-                    _updateFlagsForUnion(t, flags)
-                elif isinstance(e, BType):
-                    collated.append(e)
-                    _updateFlagsForUnion(t, flags)
-                else:
-                    raise BTypeError("OPEN: Needs description")
-    collated.sort(key=_typeId)
-    compacted = [collated[0]]                  # add the first
-    for i in range(1, len(collated)):       # from the second to the last, if each is different to the prior add it
-        if collated[i] != collated[i-1]:
-            compacted.append(collated[i])
-    return tuple(compacted), flags
-
-def _updateFlagsForUnion(t, flags):
-    if isinstance(t, BType):
-        if t.hasT:
-            flags.hasT = True
-
-
 def _sortedIntersectionTypes(types, singleSV):
     flags = _Flags()
-    if len(types) == 1:
-        _updateFlagsForIntersection(types[0], flags, singleSV)
-        return types, flags
+    if len(types) < 2: raise ProgrammerError("Needs 2 or more types")
     collated = []
     for t in types:
         if isinstance(t, BTIntersection):            # BTIntersection is a subclass of BType so this must come first
@@ -654,6 +93,7 @@ def _sortedIntersectionTypes(types, singleSV):
             collated.append(t)
             _updateFlagsForIntersection(t, flags, singleSV)
         else:
+            1/0 # when is this case used?
             for e in t:
                 if isinstance(e, BTIntersection):    # BTIntersection is a subclass of BType so this must come first
                     collated.extend(e.types)
@@ -720,164 +160,10 @@ class _SubtractStuff:
 
 
 
-class BTTuple(BType):
-    # product type accessed by ordinal
-    _BTTupleByTypes = {}
-
-    def __new__(cls, *types):
-        # allow empty tuple and tuple of one
-        if (instance := cls._BTTupleByTypes.get(types, Missing)) is Missing:
-            bt = sys._sharedKernel.tm.tuple(*types)
-            instance = super()._define(bt)
-            instance.types = types
-            cls._BTTupleByTypes[types] = instance
-        return instance
-
-    def ppT(self):
-        if a := self.ppName(): return a
-        ts = []
-        hasCompound = False
-        for t in self.types:
-            pp, compound, childCompound = ppT(t)
-            ts.append(f'({pp})' if compound and childCompound else pp)
-            hasCompound = hasCompound or compound
-        if ts:
-            return (' * ' if hasCompound else '*').join(ts), len(ts) > 1, hasCompound
-        else:
-            # the null tuple
-            return '()', False, False
-
-    def __iter__(self):
-        # required so tuple can be used in zip here - `for tArg, tSig in zip(tArgs[0:len(sd.sig)], sd.sig):`
-        return iter(self.types)
-
-
-
-class BTStruct(BType):
-    # product type accessed by name
-    _BTStructByTypes = {}
-
-    def __new__(cls, *args, **kwargs):
-        if args:
-            if len(args) == 1 and isinstance(args[0], dict):
-                names = tuple(args[0].keys())
-                types = tuple(args[0].values())
-                typeByName = dict(zip(names, types))
-            elif len(args) == 2 and isinstance(args[0], (tuple, list)) and isinstance(args[1], (tuple, list)):
-                names = tuple(args[0])
-                types = tuple(args[1])
-                typeByName = dict(zip(names, types))
-            else:
-                raise BTypeError('Unhandled case')
-        else:
-            names = tuple(kwargs.keys())
-            types = tuple(kwargs.values())
-            typeByName = kwargs
-        if len(names) != len(types):
-            raise BTypeError('names and tyoes must be of same length')
-        if (instance := cls._BTStructByTypes.get((names, types), Missing)) is Missing:
-            bt = sys._sharedKernel.tm.struct(names, types)
-            instance = super()._define(bt)
-            instance.typeByName = typeByName
-            cls._BTStructByTypes[(names, types)] = instance
-        return instance
-
-    @property
-    def names(self):
-        return self.typeByName.keys()
-
-    def ppT(self):
-        if a := self.ppName(): return a
-        ts = []
-        hasCompound = False
-        for i, (name, t) in enumerate(self.typeByName.items()):
-            pp, compound, childCompound = ppT(t)
-            ts.append(f'{name}:{pp}')
-            hasCompound = hasCompound or compound
-        return f'{{{", ".join(ts)}}}', False, hasCompound
-
 S = BTStruct
 
 
 
-class BTSeq(BType):
-    # homogenous discrete / finite map (exponential) type accessed by ordinal - i.e. N**T, 3**T etc
-    _BTSeqByTypes = {}
-
-    def __new__(cls, mappedType):
-        if (instance := cls._BTSeqByTypes.get(mappedType, Missing)) is Missing:
-            bt = sys._sharedKernel.tm.seq(mappedType)
-            instance = super()._define(bt)
-            instance.mappedType = mappedType
-            cls._BTSeqByTypes[mappedType] = instance
-        return instance
-
-    def ppT(self):
-        if a := self.ppName(): return a
-        pp2, compound2, childCompound2 = ppT(self.mappedType)
-        if compound2 and childCompound2: pp2 = f'({pp2})'
-        return f'N**{pp2}', True, False
-
-
-
-class BTMap(BType):
-    # homogenous discrete / finite map (exponential) type accessed by key - e.g. T2**T1 T1->T2
-    _BTMapByTypes = {}
-
-    def __new__(cls, indexType, mappedType):
-        types = (indexType, mappedType)
-        if (instance := cls._BTMapByTypes.get(types, Missing)) is Missing:
-            bt = sys._sharedKernel.tm.map(indexType, mappedType)
-            instance = super()._define(bt)
-            instance.indexType = indexType
-            instance.mappedType = mappedType
-            cls._BTMapByTypes[types] = instance
-        return instance
-
-    def ppT(self):
-        if a := self.ppName(): return a
-        pp1, compound1, childCompound1 = ppT(self.indexType)
-        pp2, compound2, childCompound2 = ppT(self.mappedType)
-        if compound1: pp1 = f'({pp1})'
-        if compound2: pp2 = f'({pp2})'
-        return f'{pp1}**{pp2}', True, False
-
-
-
-class BTFn(BType):
-    # homogenous, generalised and potentially infinite exponential type - aka function
-    BTFnByTypes = {}
-
-    __slots__ = ['tRet', 'tArgs']
-
-    def __new__(cls, tArgs, tRet):
-        if not isinstance(tArgs, BTTuple):
-            tArgs = BTTuple(*tArgs)
-        types = (tArgs, tRet)
-        if (instance := cls.BTFnByTypes.get(types, Missing)) is Missing:
-            bt = sys._sharedKernel.tm.fn(tuple(t for t in tArgs), tRet)
-            instance = super()._define(bt)
-            instance.tArgs = tArgs
-            instance.tRet = tRet
-            cls.BTFnByTypes[types] = instance
-        return instance
-
-    def ppT(self):
-        if a := self.ppName(): return a
-        pp1, compound1, childCompound1 = ppT(self.tArgs)
-        pp2, compound2, childCompound2 = ppT(self.tRet)
-        if compound1 and childCompound1: pp1 = f'({pp1})'
-        if compound2 and childCompound2: pp2 = f'({pp2})'
-        return f'{pp1}{" ^ " if (compound1 or compound2) else "^"}{pp2}', True, compound1 or compound2
-
-    @property
-    def numargs(self):
-        return len(self.tArgs.types)
-
-
-
-def ppT(t):
-    return (t.__name__, False, False) if isinstance(t, type) else t.ppT()
 
 def _anyHasT(*types):
     for t in types:
@@ -916,9 +202,21 @@ O_O = 9
 
 SCHEMA_PENALTY = 0.5
 
+
+def ensurePyBType(xOrBt):
+    if type(xOrBt).__name__ == 'BType':
+        bmtid = sys._gtm.bmtid(xOrBt)
+        if bmtid == bmtmap: return sys._gtm.replaceWith(xOrBt, BTMap._new(xOrBt))
+        else: raise NotYetImplemented(f'bmtid={bmtnameById[bmtid]}')
+    else:
+        return xOrBt
+
+
+
 def fitsWithin(a, b, TRACE=False, fittingSigs=False):
     # answers a tuple {cacheID, doesFit, tByT, distance}
-
+    a = ensurePyBType(a)
+    b = ensurePyBType(b)
     # a must be a concrete type
     # if hasattr(a, 'hasT') and a.hasT:
     if a.hasT:
@@ -1102,7 +400,7 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
                         distance += 1
                     else: # len(Ts) == 1:
                         # add the match to tByT - distance is the usual SCHEMA_PENALTY for a T match
-                        matchedT = a_[0] if len(a_) == 1 else BTIntersection(*a_)
+                        matchedT = a_[0] if len(a_) == 1 else BTIntersection.noSpaceCheck(a_)
                         tByT[Ts[0]] = matchedT
                         distance += SCHEMA_PENALTY
                     return _processA_(a_, cacheId, tByT, distance + len(a_))
@@ -1118,7 +416,7 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
                     return (cacheId, False, Missing, Missing)  # i.e. there is something missing in a that is required by b
                 else:
                     # wildcard match is fine, metric is SCHEMA_PENALTY to loose against exact match
-                    matchedT = a_[0] if len(a_) == 1 else BTIntersection(*a_)
+                    matchedT = a_[0] if len(a_) == 1 else BTIntersection.noSpaceCheck(a_)
                     return (cacheId, True, {Ts[0]: matchedT}, SCHEMA_PENALTY + len(weakenings) + len(a_))
         else:
             a_, ab, b_, weakenings = _partitionIntersectionTLs(a.types, b.types)
@@ -1148,7 +446,7 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
             if b_:
                 if len(b_) == 1 and isT(b_[0]) and len(a_) > 0:
                     # wildcard match is always fine, metric is SCHEMA_PENALTY to loose against exact match
-                    matchedT = a_[0] if len(a_) == 1 else BTIntersection(*a_)
+                    matchedT = a_[0] if len(a_) == 1 else BTIntersection.noSpaceCheck(a_)
                     return (cacheId, True, {b_[0]: matchedT}, SCHEMA_PENALTY + len(weakenings) + len(a_))
                 if _anyNotImplicit(b_):  # check for (matrix) fitsWithin (matrix & aliased) etc
                     return (cacheId, False, Missing, Missing)  # i.e. there is something missing in a that is required by b
@@ -1242,7 +540,7 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
         else:
             return (cacheId, False, Missing, Missing)
 
-    elif isinstance(b, BTNom):
+    elif isinstance(b, BTAtom):
         # already a.id != b.id so must be False
         return (cacheId, False, Missing, Missing)
 
@@ -1256,15 +554,25 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
 
     elif isinstance(b, BTStruct):
         # b defines what is required, a defines what is available
-        # iterate through b's names and check if they are available in a
-        aF2T, bF2T = a.typeByName, b.typeByName
-        if len(aF2T) < len(bF2T): return (cacheId, False, Missing, Missing)
-        for bf, bT in bF2T.items():
-            aT = aF2T.get(bf, Missing)
-            if aT is Missing: return (cacheId, False, Missing, Missing)
-            doesFit, tByT, distance = cacheAndUpdate(fitsWithin(aT, bT, TRACE, fittingSigs), tByT, distance)
+        aTypes, bTypes = a.types, b.types
+        if len(aTypes) < len(bTypes): return (cacheId, False, Missing, Missing)
+        for nA, tA, nB, tB in zip(a.names, aTypes, b.names, bTypes):
+            if nA != nB: return (cacheId, False, Missing, Missing)
+            doesFit, tByT, distance = cacheAndUpdate(fitsWithin(tA, tB, TRACE, fittingSigs), tByT, distance)
             if not doesFit: return (cacheId, False, Missing, Missing)
         return (cacheId, True, tByT, distance)
+
+    # elif isinstance(b, BTRec):
+    #     # b defines what is required, a defines what is available
+    #     # iterate through b's names and check if they are available in a
+    #     aF2T, bF2T = a.typeByName, b.typeByName
+    #     if len(aF2T) < len(bF2T): return (cacheId, False, Missing, Missing)
+    #     for bf, bT in bF2T.items():
+    #         aT = aF2T.get(bf, Missing)
+    #         if aT is Missing: return (cacheId, False, Missing, Missing)
+    #         doesFit, tByT, distance = cacheAndUpdate(fitsWithin(aT, bT, TRACE, fittingSigs), tByT, distance)
+    #         if not doesFit: return (cacheId, False, Missing, Missing)
+    #     return (cacheId, True, tByT, distance)
 
     elif isinstance(b, BTSeq):
         doesFit2, tByT, distance = cacheAndUpdate(fitsWithin(a.mappedType, b.mappedType, TRACE, fittingSigs), tByT, distance)
@@ -1308,23 +616,42 @@ def _anyExplicit(ts):
     return False
 
 def _processA_(a_, cacheId, tByT, lenWeakenings):
-    exclusiveCount = 0
+    spaceCount = 0
     for ta in a_:
         if isinstance(ta, BType):
-            if ta.familial:
-                implicitWeakenings = [tw for tw in _weakenings.get(ta, ()) if tw in _implicitTypes]
-                if not implicitWeakenings:
-                    return (cacheId, False, Missing, Missing)
-            elif ta.explicit:
+            if ta.explicit:
                 return (cacheId, False, Missing, Missing)
-            elif ta.orthogonal:
-                exclusiveCount += 1
+            elif (root := ta.rootSpace):
+                # OPEN: needs doing properly
+                spaceCount += 1
         else:
-            exclusiveCount += 1
-    if exclusiveCount > 1:
-        raise BTypeError("OPEN: Needs description")
+            spaceCount += 1
+    if spaceCount > 1:
+        try:
+            tlid = sys._gtm.intersectionTlidFor(a_)
+        except:
+            print("ponder some more")
+            # raise BTypeError("OPEN: Needs description")
     return (cacheId, True, tByT, len(a_) + lenWeakenings)
 
+# def _processA_(a_, cacheId, tByT, lenWeakenings):
+#     exclusiveCount = 0
+#     for ta in a_:
+#         if isinstance(ta, BType):
+#             if ta.familial:
+#                 implicitWeakenings = [tw for tw in _weakenings.get(ta, ()) if tw in _implicitTypes]
+#                 if not implicitWeakenings:
+#                     return (cacheId, False, Missing, Missing)
+#             elif ta.explicit:
+#                 return (cacheId, False, Missing, Missing)
+#             elif ta.space:
+#                 # OPEN: needs doing properly
+#                 exclusiveCount += 1
+#         else:
+#             exclusiveCount += 1
+#     if exclusiveCount > 1:
+#         raise BTypeError("OPEN: Needs description")
+#     return (cacheId, True, tByT, len(a_) + lenWeakenings)
 
 def cacheAndUpdate(result, tByT, distance=Missing):
     cacheId, doesFit, tByTNew, distance_ = result
@@ -1473,7 +800,7 @@ def hasT(t):
         raise ProgrammerError()
 
 
-T = BTSchemaVariable.define("T")
+T = BTSchemaVariable("T")
 
 _schemaVariablesByOrd = [Missing]
 def schemaVariableForOrd(ord):
@@ -1482,7 +809,7 @@ def schemaVariableForOrd(ord):
         i2 = i1 + 20 - 1
         _schemaVariablesByOrd += [Missing] * 20   # allocate 20 extra each time
         for i in range(i1, i2 + 1):
-            _schemaVariablesByOrd[i] = BTSchemaVariable.define(f'T{i}')
+            _schemaVariablesByOrd[i] = BTSchemaVariable(f'T{i}')
     return _schemaVariablesByOrd[ord]
 
 
@@ -1490,29 +817,21 @@ def isT(x):
     return isinstance(x, BTSchemaVariable) and x.hasT  # mildly faster than x.base is T
 
 
-for i in range(1, 21):
+for i in range(1, 10):
     Ti = schemaVariableForOrd(i)
     locals()[Ti.name] = Ti
 
-for o in range(26):
-    To = BTSchemaVariable.define(f"T{chr(ord('a')+o)}")
-    locals()[To.name] = To
 
-
-N = BTSchemaVariable.define('N')
+N = BTAtom('N')
 _ordinalTypes = [N]
 
-for i in range(1, 11):
-    Ni = BTSchemaVariable.define(f'N{i}')
+for i in range(1, 10):
+    Ni = BTAtom(f'N{i}')
     _ordinalTypes.append(Ni)
     locals()[Ni.name] = Ni
 
-for o in range(26):
-    No = BTSchemaVariable.define(f"N{chr(ord('a')+o)}")
-    _ordinalTypes.append(No)
-    locals()[No.name] = No
 
-BType._arrayOrdinalTypes = tuple(_ordinalTypes)   # COULDDO use 'N' in name to detect ordinals
+BType._arrayOrdinalTypes = tuple(_ordinalTypes)
 
 
 _implicitTypes = ()

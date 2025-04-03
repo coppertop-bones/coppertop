@@ -68,7 +68,7 @@ class tvtuple:
         raise NotYetImplemented
 
 
-class tvstruct:
+class _tvstruct:
     __slots__ = ['_pub', '_pvt']
 
     def __init__(self, *args_, **kwargs):
@@ -80,51 +80,51 @@ class tvstruct:
 
         constr, args = (args_[0][0], args_[1:]) if args_ and isinstance(args_[0], Constructors) else (Missing, args_)
         if len(args) == 0:
-            # tvstruct(), tvstruct(**kwargs)
+            # _tvstruct(), _tvstruct(**kwargs)
             if constr:
                 super().__getattribute__('_pvt')['_t'] = constr
             if kwargs:
                 super().__getattribute__('_pub').update(kwargs)
         elif len(args) == 1:
-            # tvstruct(tvstruct), tvstruct(dictEtc)
+            # _tvstruct(_tvstruct), _tvstruct(dictEtc)
             arg1 = args[0]
-            if isinstance(arg1, tvstruct):
-                # tvstruct(tvstruct)
+            if isinstance(arg1, _tvstruct):
+                # _tvstruct(_tvstruct)
                 super().__getattribute__('_pvt')['_t'] = arg1._t
                 super().__getattribute__('_pub').update(arg1._pub)
             elif isinstance(arg1, (dict, list, tuple, zip)):
-                # tvstruct(dictEtc)
+                # _tvstruct(dictEtc)
                 super().__getattribute__('_pub').update(arg1)
                 if constr:
                     super().__getattribute__('_pvt')['_t'] = constr
             else:
-                # tvstruct(t), tvstruct(t, **kwargs)
+                # _tvstruct(t), _tvstruct(t, **kwargs)
                 super().__getattribute__('_pvt')['_t'] = arg1
                 if kwargs:
-                    # tvstruct(t, **kwargs)
+                    # _tvstruct(t, **kwargs)
                     super().__getattribute__('_pub').update(kwargs)
         elif len(args) == 2:
-            # tvstruct(t, tvstruct), tvstruct(t, dictEtc)
+            # _tvstruct(t, _tvstruct), _tvstruct(t, dictEtc)
             arg1, arg2 = args
             if kwargs:
                 # this needs sorting but I don't have time right now
                 # came up for `PMF(Brown=30, Yellow=20, Red=20, Green=10, Orange=10, Tan=10)`
-                # having two types (PMF and then dstruct do the construction so args is (dstruct, PMF)
+                # having two types (PMF and then _tvstruct do the construction so args is (_tvstruct, PMF)
                 super().__getattribute__('_pvt')['_t'] = arg2
                 super().__getattribute__('_pub').update(kwargs)
                 # raise TypeError('No kwargs allowed when 2 args are provided')
                 return None
             super().__getattribute__('_pvt')['_t'] = arg1
-            if isinstance(arg2, tvstruct):
-                # tvstruct(t, tvstruct)
+            if isinstance(arg2, _tvstruct):
+                # _tvstruct(t, _tvstruct)
                 super().__getattribute__('_pub').update(arg2._pub)
             else:
-                # tvstruct(t, dictEtc)
+                # _tvstruct(t, dictEtc)
                 super().__getattribute__('_pub').update(arg2)
         else:
             raise TypeError(
-                'tvstruct(...) must be of form tvstruct(), tvstruct(**kwargs), tvstruct(tvstruct), tvstruct(dictEtc), ' +
-                'tvstruct(t), tvstruct(t, **kwargs), tvstruct(t, tvstruct), tvstruct(t, dictEtc), '
+                '_tvstruct(...) must be of form _tvstruct(), _tvstruct(**kwargs), _tvstruct(_tvstruct), _tvstruct(dictEtc), ' +
+                '_tvstruct(t), _tvstruct(t, **kwargs), _tvstruct(t, _tvstruct), _tvstruct(t, dictEtc), '
             )
 
     def __asT__(self, t):
@@ -132,7 +132,7 @@ class tvstruct:
         return self
 
     def __copy__(self):
-        return tvstruct(self)
+        return _tvstruct(self)
 
     def __getattribute__(self, f):
         if f[0:2] == '__':
@@ -180,15 +180,15 @@ class tvstruct:
     def __setattr__(self, f, v):
         if f[0:1] == "_":
             if f == '_t_': return super().__getattribute__('_pvt').__setitem__('_t', v)
-            # if f in ('_t', '_v', '_pvt', '_pub'): raise AttributeError(f"Can't set {f} on tvstruct")
-            if f in ('_pvt', '_pub'): raise AttributeError(f"Can't set {f} on tvstruct")
+            # if f in ('_t', '_v', '_pvt', '_pub'): raise AttributeError(f"Can't set {f} on _tvstruct")
+            if f in ('_pvt', '_pub'): raise AttributeError(f"Can't set {f} on _tvstruct")
             return super().__getattribute__('_pvt').__setitem__(f, v)
         return super().__getattribute__('_pub').__setitem__(f, v)
 
     def __getitem__(self, fOrFs):
         if isinstance(fOrFs, (list, tuple)):
             kvs = {f: self[f] for f in fOrFs}
-            return tvstruct(self._t, kvs)
+            return _tvstruct(self._t, kvs)
         else:
             return super().__getattribute__('_pub').__getitem__(fOrFs)
 
@@ -196,7 +196,7 @@ class tvstruct:
         if isinstance(f, str):
             if f[0:1] == "_":
                 if f in ('_pvt', '_pub', '_keys', '_kvs', '_values', '_update', '_get'):
-                    raise AttributeError(f'name {f} is reserved for use by tvstruct')
+                    raise AttributeError(f'name {f} is reserved for use by _tvstruct')
                 # if f in super().__getattribute__('_pvt'):
                 #     raise AttributeError(f'name {f} is already in pvt use')
         super().__getattribute__('_pub').__setitem__(f, v)
@@ -227,7 +227,7 @@ class tvstruct:
         _t = super().__getattribute__('_pvt')['_t']
         itemStrings = (f"{str(k)}={repr(v)}" for k, v in _pub.items())
 
-        if type(_t) is abc.ABCMeta or _t is tvstruct:
+        if type(_t) is abc.ABCMeta or _t is _tvstruct:
             name = _t.__name__
         else:
             name = str(self._t)
@@ -240,7 +240,7 @@ class tvstruct:
     def __eq__(self, rhs):  # self == rhs
         if isinstance(rhs, dict):
             raise NotYetImplemented()
-        elif isinstance(rhs, tvstruct):
+        elif isinstance(rhs, _tvstruct):
             return self._kvs() == rhs._kvs()
         else:
             return False

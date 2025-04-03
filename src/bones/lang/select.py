@@ -18,13 +18,12 @@ from bones.jones import BTypeError
 from bones.core.context import context
 from bones.core.sentinels import Missing
 from bones.core.errors import ProgrammerError, ErrSite
-from bones.lang.metatypes import cacheAndUpdate, fitsWithin, BTNom
-from bones.lang.types import obj
+from bones.lang.metatypes import cacheAndUpdate, fitsWithin, BTAtom, BType
 from bones.core.utils import raiseLess
 
 
-py = BTNom.ensure("py").setOrthogonal(obj)
 
+py = BType('py: atom in mem')
 
 def _selectFunction(callerSig, fnBySig, nameForError, fnBySigByNumArgsForError):
     matches = []

@@ -20,67 +20,63 @@ if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 __all__ = [
     'noun', 'nullary', 'unary', 'binary', 'ternary',
-    'obj',
+    'mem',
     'TBI', 'void', 'null',
     'tup', 'struct', 'frame',
     'litint', 'litdec', 'littxt', 'litsym', 'litsyms', 'litdate', 'litframe', 'littup', 'litstruct',
 ]
 
 from bones.core.sentinels import Null, Void
-from bones.lang.metatypes import BTNom, BType
+from bones.lang.metatypes import BTAtom, BType
 
+mem = BType('mem')
+noun = BTAtom("noun")
+nullary = BTAtom("nullary")
+unary = BTAtom("unary")
+binary = BTAtom("binary")
+ternary = BTAtom("ternary")
 
-noun = BTNom.define("noun")
-nullary = BTNom.define("nullary")
-unary = BTNom.define("unary")
-binary = BTNom.define("binary")
-ternary = BTNom.define("ternary")
-
-# obj is used in setOrthogonal to show the type and an object of some sort and thus the intersection with
-# other orthogonal(obj) types is uninhabited
-obj = BTNom.define("obj")
-
-TBI = BTNom.define("TBI").setOrthogonal(obj)
-void = BTNom.define('void').setOrthogonal(obj)     # something that isn't there and shouldn't be there
-null = BTNom.define('null')                        # the null set - something that isn't there and that's okay
+TBI = BTAtom("TBI", space=mem)
+void = BTAtom('void', space=mem)      # something that isn't there and shouldn't be there
+null = BTAtom('null')                       # the null set - something that isn't there and that's okay
 
 Null._t = null
 Void._t = void
 
 # so we can have more than one class for frames (and tups and structs, maybe less likely)
-# dframe = frame[tvstruct].nameAs('dframe')
+# dframe = frame[dstruct].nameAs('dframe')
 # polarframe = frame[pl.DataFrame].nameAs('polarframe')
-tup = BTNom.define('tup')
-struct = BTNom.define('struct')
-frame = BTNom.define('frame')
+tup = BTAtom('tup')
+struct = BTAtom('struct')
+frame = BTAtom('frame')
 
 
 # literal types used in parser
-litint = BTNom.ensure('litint').setOrthogonal(obj)      # OPEN: sort out standard types
-litdec = BTNom.define('litdec').setOrthogonal(obj)
-littxt = BTNom.define('littxt').setOrthogonal(obj)      # this allows us to provide different encodings in source and map to the core one
-litsym = BTNom.define('litsym').setOrthogonal(obj)
-litsyms = BTNom.define('litsyms').setOrthogonal(obj)
-litdate = BTNom.define('litdate').setOrthogonal(obj)
-littup = tup['littup'].setOrthogonal(obj)
-litstruct = struct['litstruct'].setOrthogonal(obj)
-litframe = frame['litframe'].setOrthogonal(obj)
+litint = BTAtom('litint', space=mem)      # OPEN: sort out standard types
+litdec = BTAtom('litdec', space=mem)
+littxt = BTAtom('littxt', space=mem)      # this allows us to provide different encodings in source and map to the core one
+litsym = BTAtom('litsym', space=mem)
+litsyms = BTAtom('litsyms', space=mem)
+litdate = BTAtom('litdate', space=mem)
+littup = BType('littup: littup & tup in mem')
+litstruct = BType('litstruct: litstruct & struct in mem')
+litframe = BType('litframe: litframe & frame in mem')
 
 
 
 # expose a bunch of schema variables - code can get more via schemaVariableForOrd
 T = BType('T')
-for i in range(1, 21):
+for i in range(1, 10):
     t = BType(f'T{i}')
     locals()[t.name] = t
-for o in range(26):
-    t = BType(f"T{chr(ord('a') + o)}")
-    locals()[t.name] = t
+# for o in range(26):
+#     t = BType(f"T{chr(ord('a') + o)}")
+#     locals()[t.name] = t
 
 __all__ += [
     'T',
-    'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10',
-    'T11', 'T12', 'T13', 'T14', 'T15', 'T16', 'T17', 'T18', 'T19', 'T20',
-    'Ta', 'Tb', 'Tc', 'Td', 'Te', 'Tf', 'Tg', 'Th', 'Ti', 'Tj', 'Tk', 'Tl', 'Tm',
-    'Tn', 'To', 'Tp', 'Tq', 'Tr', 'Ts', 'Tt', 'Tu', 'Tv', 'Tw', 'Tx', 'Ty', 'Tz'
+    'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', #'T10',
+    # 'T11', 'T12', 'T13', 'T14', 'T15', 'T16', 'T17', 'T18', 'T19', 'T20',
+    # 'Ta', 'Tb', 'Tc', 'Td', 'Te', 'Tf', 'Tg', 'Th', 'Ti', 'Tj', 'Tk', 'Tl', 'Tm',
+    # 'Tn', 'To', 'Tp', 'Tq', 'Tr', 'Ts', 'Tt', 'Tu', 'Tv', 'Tw', 'Tx', 'Ty', 'Tz'
 ]
