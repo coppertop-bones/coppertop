@@ -79,13 +79,14 @@ from coppertop._scopes import _CoWProxy, _UNDERSCORE
 from bones.core.errors import ProgrammerError, ErrSite, CPTBError, NotYetImplemented
 from bones.core.sentinels import Missing, function
 from bones.core.utils import firstKey, raiseLess
-from bones.lang.metatypes import BType, fitsWithin as origFitsWithin, cacheAndUpdate, BTFn, BTTuple, BTNom, \
-    BTOverload, _BTypeById, _aliases, BTypeError
-from bones.lang.types import nullary, unary, binary, ternary, void, obj
+from bones.lang.metatypes import BType, fitsWithin as origFitsWithin, cacheAndUpdate, BTFn, BTTuple, BTAtom, \
+    BTOverload, _BTypeById, _btypeByClass
+from bones.lang.types import nullary, unary, binary, ternary, void
 from bones.lang.select import _ppType, _selectFunction
+from bones.jones import BTypeError
 
 
-py = BTNom.ensure("py").setOrthogonal(obj)
+py = BType('py: atom in mem')
 
 class CoppertopError(CPTBError): pass
 class CoppertopImportError(ImportError): pass
@@ -99,8 +100,8 @@ class BModule(types.ModuleType):
             answer = super().__getattribute__(name)
         except AttributeError as ex:
             raise AttributeError(
-                f"bones module '{self.__name__}' has no attribute '{name}' - maybe it's defined in a python module "
-                f"that needs to be imported"
+                f'bones module "{self.__name__}" has no attribute "{name}" - maybe it\'s defined in a python module '
+                f'that needs to be imported'
             ) from None
         return answer
 
@@ -326,13 +327,13 @@ def _tArgFromAnnotation(annotation, modname, fnnameForErr, msgForErr):
     elif annotation == NO_ANNOTATION:
         return py
     elif isinstance(annotation, builtins.type):
-        if (tArg := _aliases.get(annotation, Missing)) is Missing:
+        if (tArg := _btypeByClass.get(annotation, Missing)) is Missing:
             name = annotation.__module__ + "." + annotation.__name__
-            tArg = BTNom.ensure(name)
-            _aliases[annotation] = tArg
+            tArg = BTAtom(name)
+            _btypeByClass[annotation] = tArg
         return tArg
     elif annotation in _unhandledTypes:
-        raise TypeError(f'{modname}.{fnnameForErr} - {msgForErr}{annotation}, use {_aliases[annotation]} instead', ErrSite("illegal argument type"))
+        raise TypeError(f'{modname}.{fnnameForErr} - {msgForErr}{annotation}, use {_btypeByClass[annotation]} instead', ErrSite("illegal argument type"))
     elif isinstance(annotation, str):
         raise TypeError(
             f'{modname}.{fnnameForErr} - {msgForErr} str - has `from __future__ import annotations` been invoked in the module',
@@ -462,7 +463,7 @@ class _Dispatcher:
                 _SCTracker.append((self, numArgs, pSC))
             pSC, results = cache
 
-            hasValue = jones.sc_fillQuerySlotWithBTypesOf(pSC, args, _aliases, py, _CoWProxy)
+            hasValue = jones.sc_fillQuerySlotWithBTypesOf(pSC, args, _btypeByClass, py, _CoWProxy)
 
             # t2 = time.perf_counter_ns()
             resultId = jones.sc_getFnId(pSC)
@@ -582,7 +583,7 @@ def _typeOf(x):
         t = builtins.type(x)
         if t is _CoWProxy:
             t = builtins.type(x._target)         # return the type of thing being proxied
-        return _aliases.get(t, t)       # type python types as their bones equivalent
+        return _btypeByClass.get(t, t)       # type python types as their bones equivalent
 
 
 def _sig(x):
