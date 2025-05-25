@@ -14,11 +14,10 @@
 import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
-from bones.jones import BTypeError
 from bones.core.context import context
 from bones.core.sentinels import Missing
 from bones.core.errors import ProgrammerError, ErrSite
-from bones.lang.metatypes import cacheAndUpdate, fitsWithin, BTAtom, BType
+from bones.lang.metatypes import updateSchemaVarsWith, fitsWithin, BType, SchemaError, BTypeError
 from bones.core.utils import raiseLess
 
 
@@ -35,24 +34,28 @@ def _selectFunction(callerSig, fnBySig, nameForError, fnBySigByNumArgsForError):
         fallback = False
         match = True
         argDistances = []
-        tByT = {}
+        schemaVars = {}
         for tArg, tParam in zip(callerSig, fnSig):
             if tParam is py:
                 fallback = True
                 argDistances.append(0.5)
             else:
-                doesFit, tByTLocal, argDistance = cacheAndUpdate(fitsWithin(tArg, tParam, False), tByT, 0)
-                if not doesFit:
+                fits = fitsWithin(tArg, tParam)
+                if not fits:
                     match = False
                     break
-                tByT = tByTLocal
+                try:
+                    schemaVars, argDistance = updateSchemaVarsWith(schemaVars, 0, fits)
+                except SchemaError:
+                    match = False
+                    break
                 argDistances.append(argDistance)
         if match:
             distance = sum(argDistances)
             if fallback:
-                fallbacks.append((fn, tByT, distance, argDistances))
+                fallbacks.append((fn, schemaVars, distance, argDistances))
             else:
-                matches.append((fn, tByT, distance, argDistances))
+                matches.append((fn, schemaVars, distance, argDistances))
         if distance == 0:
             break
     if distance == 0:
@@ -74,7 +77,7 @@ def _selectFunction(callerSig, fnBySig, nameForError, fnBySigByNumArgsForError):
             caller = f'{nameForError}({",".join([repr(e) for e in callerSig])})'
             print(f'1. {caller} fitsWithin:', file=sys.stderr)
             for fn, tByT, distance, argDistances in matches:
-                callee = f'{fn.name}({",".join([repr(argT) for argT in fn.sig])}) (argDistances: {argDistances}) defined in {fn.modname}<{fn.pymodname}>'
+                callee = f'{fn.name}({",".join([repr(argT) for argT in fn.sig])}) (argDistances: {argDistances}) defined in {fn.modname}'
                 print(f'  {callee}', file=sys.stderr)
             raiseLess(TypeError(f'Found {len(matches)} matches and {len(fallbacks)} fallbacks for {caller}', ErrSite("#2")))
     elif len(fallbacks) > 0:
@@ -88,7 +91,7 @@ def _selectFunction(callerSig, fnBySig, nameForError, fnBySigByNumArgsForError):
             caller = f'2. {actual, expectednameForError}({",".join([repr(e) for e in callerSig])})'
             print(f'{caller} fitsWithin:', file=sys.stderr)
             for fn, tByT, distance, argDistances in matches:
-                callee = f'{fn.name}({",".join([repr(argT) for argT in fn.sig])}) (argDistances: {argDistances}) defined in {fn.pymodname}'
+                callee = f'{fn.name}({",".join([repr(argT) for argT in fn.sig])}) (argDistances: {argDistances}) defined in {fn.modname}'
                 print(f'  {callee}', file=sys.stderr)
             raiseLess(TypeError(f'Found {len(matches)} matches and {len(fallbacks)} fallbacks for {caller}', ErrSite("#3")))
         # if not match:
@@ -96,7 +99,7 @@ def _selectFunction(callerSig, fnBySig, nameForError, fnBySigByNumArgsForError):
         #     with context(showFullType=True):
         #         lines = [
         #             f"Can't find {_ppFn(sd.name, callerSig)} ({len(callerSig)} args) in:",
-        #             f'  {_ppFn(sd.name, sd.sig, sd._argNames)} ({len(sd.sig)} args) in {sd.modname} - {sd.pymodname}'
+        #             f'  {_ppFn(sd.name, sd.sig, sd._argNames)} ({len(sd.sig)} args) in {sd.modname} - {sd.modname}'
         #         ]
         #         print('\n'.join(lines), file=sys.stderr)
         #         raiseLess(TypeError('\n'.join(lines), ErrSite("#1")))

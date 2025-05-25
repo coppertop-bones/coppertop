@@ -63,7 +63,7 @@ if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 __all__ = [
     'coppertop', 'nullary', 'unary', 'binary', 'ternary', '_', 'sig', 'context', 'typeOf', 'makeFn',
-    'fitsWithin', 'type', 'fullFitsWithin', 'SCRATCH'
+    'fitsWithin', 'type', 'SCRATCH'
 ]
 
 
@@ -79,7 +79,7 @@ from coppertop._scopes import _CoWProxy, _UNDERSCORE
 from bones.core.errors import ProgrammerError, ErrSite, CPTBError, NotYetImplemented
 from bones.core.sentinels import Missing, function
 from bones.core.utils import firstKey, raiseLess
-from bones.lang.metatypes import BType, fitsWithin as origFitsWithin, cacheAndUpdate, BTFn, BTTuple, BTAtom, \
+from bones.lang.metatypes import BType, fitsWithin as origFitsWithin, BTFn, BTTuple, BTAtom, \
     BTOverload, _BTypeById, _btypeByClass
 from bones.lang.types import nullary, unary, binary, ternary, void
 from bones.lang.select import _ppType, _selectFunction
@@ -534,8 +534,7 @@ class _Dispatcher:
                 # sequence if the return type is BTTuple (and possibly BTStruct) - also BTTuple can be coerced by default to
                 # a dseq (or similar - may should add a new tuple subclass to prevent it being treated like an exponential)
                 # add a note in bones that one of our basic ideas / building blocks is things and exponentials of things
-                doesFit, tByT, distances = cacheAndUpdate(origFitsWithin(_typeOf(answer), tRet), tByT)
-                if doesFit:
+                if origFitsWithin(_typeOf(answer), tRet):
                     # returnTime += time.perf_counter_ns() - t5; returnCount += 1
                     return answer
                 else:
@@ -709,14 +708,7 @@ if not hasattr(sys, '_coppertopImportFnHolder'):
 
 @coppertop(style=binary, dispatchEvenIfAllTypes=True)
 def fitsWithin(a, b):
-    doesFit, tByT, distances = cacheAndUpdate(origFitsWithin(a, b), {})
-    return doesFit
-
-@coppertop(style=binary, dispatchEvenIfAllTypes=True)
-def fullFitsWithin(a, b):
-    x = origFitsWithin(a, b)
-    cacheAndUpdate(x, {})
-    return x
+    return origFitsWithin(a, b)
 
 def makeFn(*args):
     if len(args) == 1:

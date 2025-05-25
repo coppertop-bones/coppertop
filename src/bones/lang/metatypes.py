@@ -26,16 +26,16 @@ if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 __all__ = ['BType', 'S']
 
-import itertools, builtins
+import itertools, builtins, collections, statistics
 
 from bones.lang._type_lang.jones_type_manager import JonesTypeManager, BType, BTAtom, BTIntersection, BTUnion, \
-    BTTuple, BTStruct, BTSeq, BTMap, BTFn, BTSchemaVariable, BTOverload, BTypeError, ppT
+    BTTuple, BTStruct, BTSeq, BTMap, BTFn, BTSchemaVariable, BTOverload, BTypeError, ppT, _btcls_by_bmtid
 from bones.lang._type_lang.jones_type_manager import _btypeByClass, _BTypeById     # used by coppertop.pipe - do not remove
 from bones.lang.type_lang import TypeLangInterpreter
 
 from bones.lang.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, bmtsvr, bmtnameById
 
-from bones.core.errors import ProgrammerError, NotYetImplemented, PathNotTested
+from bones.core.errors import ProgrammerError, NotYetImplemented, PathNotTested, WTF
 from bones.core.sentinels import Missing, Void, generator
 
 
@@ -203,99 +203,114 @@ O_O = 9
 SCHEMA_PENALTY = 0.5
 
 
-def ensurePyBType(xOrBt):
-    if type(xOrBt).__name__ == 'BType':
-        bmtid = sys._gtm.bmtid(xOrBt)
-        if bmtid == bmtmap: return sys._gtm.replaceWith(xOrBt, BTMap._new(xOrBt))
-        else: raise NotYetImplemented(f'bmtid={bmtnameById[bmtid]}')
+
+# dm should be independent of coppertop so any types needed in coppertop or bone should be created there
+# dm depends on coppertop which intern depends on bones which depends on jones
+# where do we define py?
+# bones has the function selection which uses py
+
+
+
+Fits = collections.namedtuple('Fits', ['fits', 'tByT', 'distance'])
+Fits.__bool__ = lambda self: self.fits
+
+IDENTICAL = Fits(True, {}, 0)
+DOES_NOT_FIT = Fits(False, Missing, Missing)    # or Fits(False, {}, 100000)?
+
+from bones.jones import BType as _JONES_BTYPE
+
+
+def _BTypeToPyBType(bt):
+    bmtid = sys._gtm.bmtid(bt)
+    cls = _btcls_by_bmtid[bmtid]
+    return sys._gtm.replaceWith(bt, cls._new(bt))
+
+
+class SchemaError(BTypeError): pass
+
+def fitsWithin(a, b, *, fittingSigs=False):
+    # type clean up
+    if not isinstance(a, BType) and not isinstance(a, type): a = _BTypeToPyBType(a)
+    if not isinstance(b, BType) and not isinstance(b, type): b = _BTypeToPyBType(b)
+
+    #  rather than create a bones type for every python class let's just make the fitsWithin handle them as an atom,
+    #  i.e. opaque
+
+    if isinstance(a, type):
+        if isinstance(b, BType):
+            # most fitsWithin calls in coppertop will be Python type <: BType so this is the first case
+            cacheId = (a, b.id)
+        elif isinstance(b, type):
+            return IDENTICAL if a == b else DOES_NOT_FIT     # can Python's typing stuff be used here?
+        else:
+            raise TypeError(f'a is Python {a.__class__}, b is {repr(b)}')
+    elif isinstance(a, BType):
+        if isinstance(b, type):
+            if isinstance(a, (BTAtom, BTIntersection)):
+                # (txt & ISIN) <: buildins.str, txt <: buildins.str
+                cacheId = (a.id, b)
+            else:
+                # generally `BType <: Python type` cannot be true, however, what about pydict <: dict, a A * B <: tuple
+                return DOES_NOT_FIT
+        elif isinstance(b, BType):
+            if a.id == b.id: return IDENTICAL
+            cacheId = (a.id, b.id)
+        else:
+            raise TypeError('fitsWithin only supports Python types and BTypes')
     else:
-        return xOrBt
+        raise TypeError('fitsWithin only supports Python types and BTypes')
 
-
-
-def fitsWithin(a, b, TRACE=False, fittingSigs=False):
-    # answers a tuple {cacheID, doesFit, tByT, distance}
-    a = ensurePyBType(a)
-    b = ensurePyBType(b)
-    # a must be a concrete type
-    # if hasattr(a, 'hasT') and a.hasT:
+    fits = _fitsCache.get(cacheId, Missing)
+    if fits is not Missing: return fits
     if a.hasT:
         if isinstance(a, BTFn) and isinstance(b, BTFn):
             fittingSigs = True
         if not fittingSigs:
             raise BTypeError(f'LHS type ({a}) is polymorphic and thus cannot match RHS type {b}')
-
-    distance = 0
-
-    if isinstance(b, type):
-        if a.__class__ == BTIntersection:
-            # (txt & ISIN) fitsWithin (txt) etc
-            cacheId = (a.id, b)
-        else:
-            # buildins.str fitsWithin buildins.str
-            return (Missing, a == b, Missing, distance)
-    else:
-        if isinstance(a, BType):
-            if a.id == b.id:
-                # num fitsWithin num
-                return (Missing, True, Missing, distance)
-            cacheId = (a.id, b.id)
-        else:
-            if not isinstance(a, type):
-                raise BTypeError(f"a is type {a.__class__} b is {repr(b)}")
-            cacheId = (a, b.id)
+    try:
+        _fitsCache[cacheId] = answer = _fitsWithin(a, b, fittingSigs=fittingSigs)
+        return answer
+    except SchemaError as ex:
+        return DOES_NOT_FIT
 
 
-    # check the cache - get prior tByT as well as the result
-    cached = _fitsCache.get(cacheId, Missing)
-    if cached is not Missing:
-        doesFit, tByT, distance = cached
-        return (Missing, doesFit, tByT, distance)
-
-    tByT = {}
+def _fitsWithin(a, b, fittingSigs=False):
+    # answers a Fits named tuple
 
     if isinstance(b, BTSchemaVariable):
-        # anything (except explicits) fitsWithin a wildcard
+        # anything (except explicits) <: a wildcard
         if (hasattr(a, 'explicit') and a.explicit) or (a.__class__ == BTIntersection and _anyExplicit(a.types)):
-            return (cacheId, False, Missing, Missing)
+            return DOES_NOT_FIT
         else:
-            return (cacheId, True, {b:a}, distance + SCHEMA_PENALTY)  # exact match must beat wildcard
+            return Fits(True, {b:a}, SCHEMA_PENALTY)  # exact match must beat wildcard
         # if b.base is T:
-        #     # anything (except explicits) fitsWithin a wildcard
+        #     # anything (except explicits) <: a wildcard
         #     if (hasattr(a, 'explicit') and a.explicit) or (a.__class__ == BTIntersection and _anyExplicit(a.types)):
-        #         return (cacheId, False, Missing, Missing)
+        #         return DOES_NOT_FIT
         #     else:
-        #         return (cacheId, True, {b:a}, distance + SCHEMA_PENALTY)  # exact match must beat wildcard
+        #         return Fits(True, {b:a}, distance + SCHEMA_PENALTY)  # exact match must beat wildcard
         # elif isinstance(a, BTSchemaVariable):
         #     if a.base.id == b.base.id:
-        #         # N1 fitsWithin Na
-        #         return (cacheId, True, tByT, distance)
+        #         # N1 <: Na
+        #         return Fits(True, schemaVars, distance)
         #     else:
-        #         return (cacheId, False, Missing, Missing)
+        #         return DOES_NOT_FIT
         # else:
-        #     return (cacheId, False, Missing, Missing)
+        #     return DOES_NOT_FIT
 
 
     # check the coercions
-    if (o:=_find(b, _weakenings.get(a, ()))) >= 0:
-        return (cacheId, True, tByT, distance + o + 1)
-
-    # NB for locality it would be nice to be able to define behaviour and reuse it rather than repeating
-    # the code but in a light touch way than writing a function that needs comprehending elsewhere (kinda
-    # like a named gosub), e.g.
-    # fred
-    #     ifTrue: { } :blockA
-    #     ifFalse: {xyz. blockA[]}
-    # maybe...
+    if (o := _find(b, _weakenings.get(a, ()))) >= 0:
+        return Fits(True, {}, o + 1)
 
 
     if isinstance(b, BTUnion):
         if isinstance(a, BTUnion):          # U U
-            # (str+num) fitsWithin (str+num+int)
+            # (str+num) <: (str+num+int)
             case = U_U      # every a must fit in b
         elif a.__class__ == BTIntersection: # I U
-            # (num+str) & fred  fitsWithin  (num+str)
-            # (num&fred) fitsWithin (num&fred) + (str&joe)
+            # (num+str) & fred  <:  (num+str)
+            # (num&fred) <: (num&fred) + (str&joe)
             case = I_U
         else:                               # O U
             case = O_U      # a just needs to fit any in b
@@ -303,24 +318,31 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
     elif b.__class__ == BTIntersection:
         if isinstance(a, BTUnion):          # U I
             # if an element in a is b we have a partial fit
-            # (num&fred) + (str&joe)  fitsWithin  (num&fred)
-            return (cacheId, False, Missing, Missing)
+            # (num&fred) + (str&joe)  <:  (num&fred)
+            return DOES_NOT_FIT
         elif a.__class__ == BTIntersection: # I I
-            # (matrix & square & dtup) fitsWithin (matrix & dtup & aliased)
+            # (matrix & square & dtup) <: (matrix & dtup & aliased)
             case = I_I
         else:                               # O I
-            # str fitsWithin (str&aliased)    (remember aliased is implicit)
+            # str <: (str&aliased)    (remember aliased is implicit)
             case = O_I
 
     else:
         if isinstance(a, BTUnion):          # U O
-            # if an element in a is b we have a partial fit (num + err) fitsWithin (num)
-            # also   (index ^ index) + (str ^ str)  fitsWithin  (T1 ^ T2)
-            # and    (index & square) + (index & circle)  fitsWithin  (index)
+            # consider the following cases:
+            # 1. if (any element in a) <: b we have a partial fit, e.g. (num + err) <: (num)
+            # 2. (index ^ index) + (txt ^ txt)  <:  (T1 ^ T2)      => T1: index + txt, T2: index + txt
+            # 3. (index ^ index) + (txt ^ txt)  <:  (T1 ^ T1)      => T1: index + txt
+            # 4. (index & square) + (index & circle)  <:  (index)
+            schemaVars, results = {}, []
             for t in a.types:
-                doesFit, local_tByT, distance = cacheAndUpdate(fitsWithin(t, b, TRACE, fittingSigs), dict(tByT), distance)
-                if not doesFit: return (cacheId, False, Missing, Missing)
-            return (cacheId, True, tByT, distance)
+                if not (fits := fitsWithin(t, b, fittingSigs=fittingSigs)):
+                    # 1 is currently not supported
+                    return DOES_NOT_FIT
+                # next line will through an error for cases 2 & 3
+                schemaVars, _ = updateSchemaVarsWith(schemaVars, 0, fits)
+                results.append(fits)
+            return Fits(True, schemaVars, statistics.mean([r.distance for r in results]))
         elif a.__class__ == BTIntersection: # I O
             case = I_O
         else:                               # O O
@@ -332,34 +354,48 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
 
     elif case == U_U:
         # every a must fit in b
+        schemaVars, results = {}, []
         for t in a.types:
-            doesFit, tByT, distance = cacheAndUpdate(fitsWithin(t, b, TRACE, fittingSigs), tByT, distance)
-            if not doesFit: return (cacheId, False, Missing, Missing)
-        return (cacheId, True, tByT, distance)
+            if not (fits := fitsWithin(t, b, fittingSigs=fittingSigs)):
+                return DOES_NOT_FIT
+            schemaVars, _ = updateSchemaVarsWith(schemaVars, 0, fits)
+            results.append(fits)
+        return Fits(True, schemaVars, statistics.mean([r.distance for r in results]))
 
     elif case == O_U:
-        # a just needs to fit any in b
+        # a just needs to fit any element in b - select the closest match (for distance we could return mean but
+        # schemaVars would be a problem)
+        schemVars, results = {}, []
         for t in b.types:
-            doesFit, tByT, distance = cacheAndUpdate(fitsWithin(a, t, TRACE, fittingSigs), tByT, distance)
-            if doesFit: return (cacheId, True, tByT, distance)
-        return (cacheId, False, Missing, distance)
+            if (fits := fitsWithin(a, t, fittingSigs=fittingSigs)):
+                schemVars, _ = updateSchemaVarsWith(schemVars, 0, fits)  # to the update to wheedle out conflicts
+                results.append(fits)
+        if results:
+            indexOfClosest = 0
+            for i in range(1, len(results)):
+                if results[i].distance < results[indexOfClosest].distance:
+                    indexOfClosest = i
+            return results[indexOfClosest]
+        else:
+            return DOES_NOT_FIT
 
     elif case == I_U:
+        schemaVars, distance = {}, 0
         # two cases
-        # 1 - intersection is a union member - (num&fred)  fitsWithin  (num&fred) + (str&joe)
+        # 1 - intersection is a union member - (num&fred)  <:  (num&fred) + (str&joe)
         for t in b.types:
-            doesFit, tByT, distance = cacheAndUpdate(fitsWithin(a, t, TRACE, fittingSigs), tByT, distance)
-            if doesFit: return (cacheId, True, tByT, distance)
-        # 2 - intersecting the union with another type - (num+str) & fred  fitsWithin  (num+str)
+            doesFit, schemaVars, distance = fred(fitsWithin(a, t, fittingSigs=fittingSigs), schemaVars, distance)
+            if doesFit: return Fits(True, schemaVars, distance)
+        # 2 - intersecting the union with another type - (num+str) & fred  <:  (num+str)
         a_, ab, b_, weakenings = _partitionIntersectionTLs(a.types, (b,))
-        if _anyNotImplicit(b_):  # check for (matrix) fitsWithin (matrix & aliased) etc
-            return (cacheId, False, Missing, Missing)  # i.e. there is something missing in a that is required by b
+        if _anyNotImplicit(b_):  # check for (matrix) <: (matrix & aliased) etc
+            return DOES_NOT_FIT  # i.e. there is something missing in a that is required by b
         if len(a_) == 0:                          # exact match is always fine
             raise PathNotTested()
-            return (cacheId, True, tByT, 0 + len(weakenings))
+            return Fits(True, schemaVars, 0 + len(weakenings))
         else:
             raise PathNotTested()
-            return _processA_(a_, cacheId, tByT, len(weakenings))
+            return _processA_(a_, schemaVars, len(weakenings))
 
     elif case == I_I:
         if b.hasT:
@@ -370,98 +406,102 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
                 # potentially out of order - e.g. ((N ** ccy) & list) fitsWithIn (T2 & (N ** T1))
                 # N log N process? as cross matching is required and need to choose shortest distance for T1, T2 etc
 
-                a_, ab, b_ = _partitionIntersectionTLsWithTInRhs(a.types, bTypes, TRACE, fittingSigs)
+                a_, ab, b_ = _partitionIntersectionTLsWithTInRhs(a.types, bTypes, fittingSigs=fittingSigs)
                 if b_:
-                    if _anyNotImplicit(b_):  # check for (matrix) fitsWithin (matrix & aliased) etc
-                        return (cacheId, False, Missing, Missing)  # i.e. there is something missing in a that is required by b
+                    if _anyNotImplicit(b_):  # check for (matrix) <: (matrix & aliased) etc
+                        return DOES_NOT_FIT  # i.e. there is something missing in a that is required by b
                     raise PathNotTested()
                 # check no conflicts for any T
-                for ta, tb, tByT_, distance_ in ab:
+                schemaVars, distance = {}, 0
+                for ta, tb, schemaVars_, distance_ in ab:
                     distance += distance_
-                    for TNew, tNew in tByT_.items():
-                        t = tByT.get(TNew, Missing)
+                    for TNew, tNew in schemaVars_.items():
+                        t = schemaVars.get(TNew, Missing)
                         if t is not Missing:
                             if tNew is not t and t not in _weakenings.get(tNew, ()):
                                 if tNew in _weakenings.get(t, ()):
                                     raise PathNotTested()
-                                    tByT[TNew] = tNew
+                                    schemaVars[TNew] = tNew
                                 else:
                                     raise PathNotTested()
-                                    return (cacheId, False, Missing, Missing)   # conflict found
+                                    return DOES_NOT_FIT   # conflict found
                         else:
-                            tByT[TNew] = tNew
+                            schemaVars[TNew] = tNew
                 if len(a_) == 0:  # exact match is always fine
                     if len(Ts) ==1:
-                        return (cacheId, False, Missing, Missing)
-                    return (cacheId, True, tByT, distance)
+                        return DOES_NOT_FIT
+                    return Fits(True, schemaVars, distance)
                 else:
                     if len(Ts) == 0:
                         # a match but a simple type from the intersection is dropped and we'd prefer that it was caught
                         distance += 1
                     else: # len(Ts) == 1:
-                        # add the match to tByT - distance is the usual SCHEMA_PENALTY for a T match
+                        # add the match to schemaVars - distance is the usual SCHEMA_PENALTY for a T match
                         matchedT = a_[0] if len(a_) == 1 else BTIntersection.noSpaceCheck(a_)
-                        tByT[Ts[0]] = matchedT
+                        schemaVars[Ts[0]] = matchedT
                         distance += SCHEMA_PENALTY
-                    return _processA_(a_, cacheId, tByT, distance + len(a_))
+                    return _processA_(a_, schemaVars, distance + len(a_))
 
             else: # len(Ts) == 1:
-                # (str & ISIN) >> check >> fitsWithin >> (str & T1)
+                # (str & ISIN) <: (str & T1)
                 a_, ab, b_, weakenings = _partitionIntersectionTLs(a.types, bTypes)
                 if b_:
-                    if _anyNotImplicit(b_):  # check for (matrix) fitsWithin (matrix & aliased) etc
-                        return (cacheId, False, Missing, Missing)  # i.e. there is something missing in a that is required by b
+                    if _anyNotImplicit(b_):  # check for (matrix) <: (matrix & aliased) etc
+                        return DOES_NOT_FIT  # i.e. there is something missing in a that is required by b
                 if len(a_) == 0:
-                    # (str & ISIN) >> check >> fitsWithin >> (str & ISIN & T) - T is nullset - not fine
-                    return (cacheId, False, Missing, Missing)  # i.e. there is something missing in a that is required by b
+                    # (str & ISIN) <: (str & ISIN & T) - T is nullset - not fine
+                    return DOES_NOT_FIT  # i.e. there is something missing in a that is required by b
                 else:
                     # wildcard match is fine, metric is SCHEMA_PENALTY to loose against exact match
                     matchedT = a_[0] if len(a_) == 1 else BTIntersection.noSpaceCheck(a_)
-                    return (cacheId, True, {Ts[0]: matchedT}, SCHEMA_PENALTY + len(weakenings) + len(a_))
+                    return Fits(True, {Ts[0]: matchedT}, SCHEMA_PENALTY + len(weakenings) + len(a_))
         else:
             a_, ab, b_, weakenings = _partitionIntersectionTLs(a.types, b.types)
-            if _anyNotImplicit(b_):         # check for (matrix) fitsWithin (matrix & aliased) etc
-                return (cacheId, False, Missing, Missing)   # i.e. there is something missing in a that is required by b
+            if _anyNotImplicit(b_):         # check for (matrix) <: (matrix & aliased) etc
+                return DOES_NOT_FIT   # i.e. there is something missing in a that is required by b
             if len(a_) == 0:                          # exact match is always fine
-                return (cacheId, True, tByT, 0 + len(weakenings))
+                return Fits(True, {}, len(weakenings))
             else:
-                return _processA_(a_, cacheId, tByT, len(weakenings) + len(a_))
+                return _processA_(a_, {}, len(weakenings) + len(a_))
 
     elif case == I_O:
         # isT(b) has already been handled above in the BTSchemaVariable check
-        # (num & col) fitsWithin (num)
+        # (num & col) <: (num)
         a_, ab, b_, weakenings = _partitionIntersectionTLs(a.types, (b,))
-        if _anyNotImplicit(b_):  # check for (matrix) fitsWithin (matrix & aliased) etc
-            return (cacheId, False, Missing, Missing)  # i.e. there is something missing in a that is required by b
+        if _anyNotImplicit(b_):  # check for (matrix) <: (matrix & aliased) etc
+            return DOES_NOT_FIT  # i.e. there is something missing in a that is required by b
         if len(a_) == 0:                          # exact match is always fine
-            return (cacheId, True, tByT, 0 + len(weakenings))
+            return Fits(True, {}, len(weakenings))
         else:
-            return _processA_(a_, cacheId, tByT, len(weakenings) + len(a_))
+            return _processA_(a_, {}, len(weakenings) + len(a_))
 
     elif case == O_I:
-        # str fitsWithin (str&aliased)    (remember aliased is implicit)
+        # str <: (str&aliased)    (remember aliased is implicit)
         if b.hasT:
             # MUSTDO handle wildcards properly
             a_, ab, b_, weakenings = _partitionIntersectionTLs((a,), b.types)
             if b_:
-                if len(b_) == 1 and isT(b_[0]) and len(a_) > 0:
-                    # wildcard match is always fine, metric is SCHEMA_PENALTY to loose against exact match
-                    matchedT = a_[0] if len(a_) == 1 else BTIntersection.noSpaceCheck(a_)
-                    return (cacheId, True, {b_[0]: matchedT}, SCHEMA_PENALTY + len(weakenings) + len(a_))
-                if _anyNotImplicit(b_):  # check for (matrix) fitsWithin (matrix & aliased) etc
-                    return (cacheId, False, Missing, Missing)  # i.e. there is something missing in a that is required by b
+                if len(b_) == 1 and isT(b_[0]):
+                    if len(a_) > 0:
+                        # wildcard match is always fine, metric is SCHEMA_PENALTY to loose against exact match
+                        matchedT = a_[0] if len(a_) == 1 else BTIntersection.noSpaceCheck(a_)
+                        return Fits(True, {b_[0]: matchedT}, SCHEMA_PENALTY + len(weakenings) + len(a_))
+                    else:
+                        return Fits(True, {b_[0]: sys._gtm.fromId(0)}, SCHEMA_PENALTY + len(weakenings) + len(a_))
+                if _anyNotImplicit(b_):  # check for (matrix) <: (matrix & aliased) etc
+                    return DOES_NOT_FIT  # i.e. there is something missing in a that is required by b
             if len(a_) == 0:                          # exact match is always fine
-                return (cacheId, True, tByT, 0 + len(weakenings))
+                return Fits(True, {}, 0 + len(weakenings))
             else:
-                return _processA_(a_, cacheId, tByT, len(weakenings) + len(a_))
+                return _processA_(a_, {}, len(weakenings) + len(a_))
         else:
             a_, ab, b_, weakenings = _partitionIntersectionTLs((a,), b.types)
-            if _anyNotImplicit(b_):  # check for (matrix) fitsWithin (matrix & aliased) etc
-                return (cacheId, False, Missing, Missing)  # i.e. there is something missing in a that is required by b
+            if _anyNotImplicit(b_):  # check for (matrix) <: (matrix & aliased) etc
+                return DOES_NOT_FIT  # i.e. there is something missing in a that is required by b
             if len(a_) == 0:                          # exact match is always fine
-                return (cacheId, True, tByT, 0 + len(weakenings))
+                return Fits(True, {}, 0 + len(weakenings))
             else:
-                return _processA_(a_, cacheId, tByT, len(weakenings) + len(a_))
+                return _processA_(a_, {}, len(weakenings) + len(a_))
 
     else:
         raise ProgrammerError()
@@ -469,8 +509,9 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
 
     if isinstance(a, BTFn):
         if isinstance(b, BTFn):
+            schemaVars, distance = {}, 0
             if a.numargs != b.numargs:
-                return (cacheId, False, Missing, Missing)
+                return DOES_NOT_FIT
 
             # we have agreed to handle b and we are checking if a is up to the task of being substitutable with b
             # i.e. is a <: b
@@ -479,115 +520,128 @@ def fitsWithin(a, b, TRACE=False, fittingSigs=False):
             #           a : (i+t+s,  t+s) ->  n          a can take in more in arg1, and arg2 and will output less - therefore it fits
 
             if isinstance(b.tRet, BTSchemaVariable):
-                doesFit, tByT, distance = cacheAndUpdate((cacheId, True, {b.tRet:a.tRet}, SCHEMA_PENALTY), tByT, distance)
+                doesFit, schemaVars, distance = fred(Fits(True, {b.tRet:a.tRet}, SCHEMA_PENALTY), schemaVars, distance)
             elif isinstance(a.tRet, BTSchemaVariable):
                 # e.g. T1 < txt or T1 < T1 - discard the info as it really needs some deeper analysis
-                doesFit, tByT, distance = cacheAndUpdate((cacheId, True, {}, 0), tByT, distance)
+                doesFit, schemaVars, distance = fred(Fits(True, {}, 0), schemaVars, distance)
             else:
-                doesFit, tByT, distance = cacheAndUpdate(fitsWithin(a.tRet, b.tRet, TRACE, fittingSigs), tByT, distance)
+                doesFit, schemaVars, distance = fred(fitsWithin(a.tRet, b.tRet, fittingSigs=fittingSigs), schemaVars, distance)
             if not doesFit:
                 # print(f'{a} <: {b} is false')
-                return (cacheId, False, Missing, Missing)
+                return DOES_NOT_FIT
 
             for aT, bT in zip(a.tArgs, b.tArgs):
                 if isinstance(bT, BTSchemaVariable):
-                    doesFit, tByT, distance = cacheAndUpdate((cacheId, True, {bT: aT}, SCHEMA_PENALTY), tByT, distance)
+                    doesFit, schemaVars, distance = fred(Fits(True, {bT: aT}, SCHEMA_PENALTY), schemaVars, distance)
                 elif isinstance(aT, BTSchemaVariable):
                     # e.g. T1 < txt or T1 < T1 - discard the info as it really needs some deeper analysis
-                    doesFit, tByT, distance = cacheAndUpdate((cacheId, True, {}, 0), tByT, distance)
+                    doesFit, schemaVars, distance = fred(Fits(True, {}, 0), schemaVars, distance)
                 else:
-                    doesFit, tByT, distance = cacheAndUpdate(fitsWithin(bT, aT, TRACE, fittingSigs), tByT, distance)
+                    doesFit, schemaVars, distance = fred(fitsWithin(bT, aT, fittingSigs=fittingSigs), schemaVars, distance)
                 if not doesFit:
                     # print(f'{a} <: {b} is false')
-                    return (cacheId, False, Missing, Missing)
+                    return DOES_NOT_FIT
 
             # there may be additional checks here
             # print(f'{a} <: {b} is true')
-            return (cacheId, True, tByT, distance)
+            return Fits(True, schemaVars, distance)
 
         elif isinstance(a, BTOverload):
             # we don't do soft typing in coppertop
-            return (cacheId, False, Missing, Missing)
+            return DOES_NOT_FIT
 
         else:
-            return (cacheId, False, Missing, Missing)
+            return DOES_NOT_FIT
 
     elif isinstance(a, BTOverload):
         if isinstance(b, BTFn):
             # must be a fit for one of a with b
+            schemaVars, distance = {}, 0
             for aT in a.types:
-                doesFit, local_tByT, distance = cacheAndUpdate(fitsWithin(aT, b, TRACE, fittingSigs), dict(tByT), distance)
+                doesFit, local_schemaVars, distance = fred(fitsWithin(aT, b, fittingSigs=fittingSigs), dict(schemaVars), distance)
                 if doesFit: break
             if doesFit:
-                return (cacheId, True, tByT, distance)
+                return Fits(True, schemaVars, distance)
             else:
-                return (cacheId, False, Missing, Missing)
+                return DOES_NOT_FIT
 
         elif isinstance(b, BTOverload):
             # a must fit with every one of b
+            schemaVars, distance = {}, 0
             for bT in b.types:
-                doesFit, local_tByT, distance = cacheAndUpdate(fitsWithin(a, bT, TRACE, fittingSigs), dict(tByT), distance)
-                if not doesFit: return (cacheId, False, Missing, Missing)
-            return (cacheId, True, tByT, distance)
+                doesFit, local_schemaVars, distance = fred(fitsWithin(a, bT, fittingSigs=fittingSigs), dict(schemaVars), distance)
+                if not doesFit: return DOES_NOT_FIT
+            return Fits(True, schemaVars, distance)
 
         else:
-            return (cacheId, False, Missing, Missing)
+            return DOES_NOT_FIT
 
     elif type(a) is not type(b):
         # the two types are not the same so they cannot fit (we don't allow inheritance - except in case of Ordinals)
         if a in BType._arrayOrdinalTypes and b in BType._arrayOrdinalTypes:
-            return (cacheId, True, tByT, distance)
+            return Fits(True, {}, 0)
         else:
-            return (cacheId, False, Missing, Missing)
+            return DOES_NOT_FIT
 
     elif isinstance(b, BTAtom):
         # already a.id != b.id so must be False
-        return (cacheId, False, Missing, Missing)
+        return DOES_NOT_FIT
 
     elif isinstance(b, BTTuple):
+        schemaVars, distance = {}, 0
         aTs, bTs = a.types, b.types
-        if len(aTs) != len(bTs): return (cacheId, False, Missing, Missing)
+        if len(aTs) != len(bTs): return DOES_NOT_FIT
         for i, aT in enumerate(aTs):
-            doesFit, tByT, distance = cacheAndUpdate(fitsWithin(aT, bTs[i], TRACE, fittingSigs), tByT, distance)
-            if not doesFit: return (cacheId, False, Missing, Missing)
-        return (cacheId, True, tByT, distance)
+            doesFit, schemaVars, distance = fred(fitsWithin(aT, bTs[i], fittingSigs=fittingSigs), schemaVars, distance)
+            if not doesFit: return DOES_NOT_FIT
+        return Fits(True, schemaVars, distance)
 
     elif isinstance(b, BTStruct):
         # b defines what is required, a defines what is available
+        schemaVars, distance = {}, 0
         aTypes, bTypes = a.types, b.types
-        if len(aTypes) < len(bTypes): return (cacheId, False, Missing, Missing)
+        if len(aTypes) < len(bTypes): return DOES_NOT_FIT
         for nA, tA, nB, tB in zip(a.names, aTypes, b.names, bTypes):
-            if nA != nB: return (cacheId, False, Missing, Missing)
-            doesFit, tByT, distance = cacheAndUpdate(fitsWithin(tA, tB, TRACE, fittingSigs), tByT, distance)
-            if not doesFit: return (cacheId, False, Missing, Missing)
-        return (cacheId, True, tByT, distance)
+            if nA != nB: return DOES_NOT_FIT
+            doesFit, schemaVars, distance = fred(fitsWithin(tA, tB, fittingSigs=fittingSigs), schemaVars, distance)
+            if not doesFit: return DOES_NOT_FIT
+        return Fits(True, schemaVars, distance)
 
     # elif isinstance(b, BTRec):
     #     # b defines what is required, a defines what is available
     #     # iterate through b's names and check if they are available in a
     #     aF2T, bF2T = a.typeByName, b.typeByName
-    #     if len(aF2T) < len(bF2T): return (cacheId, False, Missing, Missing)
+    #     if len(aF2T) < len(bF2T): return DOES_NOT_FIT
     #     for bf, bT in bF2T.items():
     #         aT = aF2T.get(bf, Missing)
-    #         if aT is Missing: return (cacheId, False, Missing, Missing)
-    #         doesFit, tByT, distance = cacheAndUpdate(fitsWithin(aT, bT, TRACE, fittingSigs), tByT, distance)
-    #         if not doesFit: return (cacheId, False, Missing, Missing)
-    #     return (cacheId, True, tByT, distance)
+    #         if aT is Missing: return DOES_NOT_FIT
+    #         doesFit, schemaVars, distance = fred(fitsWithin(aT, bT, fittingSigs=fittingSigs), schemaVars, distance)
+    #         if not doesFit: return DOES_NOT_FIT
+    #     return Fits(True, schemaVars, distance)
 
     elif isinstance(b, BTSeq):
-        doesFit2, tByT, distance = cacheAndUpdate(fitsWithin(a.mappedType, b.mappedType, TRACE, fittingSigs), tByT, distance)
-        if not doesFit2: return (cacheId, False, Missing, Missing)
-        return (cacheId, True, tByT, distance)
+        schemaVars, distance = {}, 0
+        doesFit2, schemaVars, distance = fred(fitsWithin(a.mappedType, b.mappedType, fittingSigs=fittingSigs), schemaVars, distance)
+        if not doesFit2: return DOES_NOT_FIT
+        return Fits(True, schemaVars, distance)
 
     elif isinstance(b, BTMap):
-        doesFit1, tByT, distance = cacheAndUpdate(fitsWithin(a.indexType, b.indexType, TRACE, fittingSigs), tByT, distance)
-        if not doesFit1: return (cacheId, False, Missing, Missing)
-        doesFit2, tByT, distance = cacheAndUpdate(fitsWithin(a.mappedType, b.mappedType, TRACE, fittingSigs), tByT, distance)
-        if not doesFit2: return (cacheId, False, Missing, Missing)
-        return (cacheId, True, tByT, distance)
+        schemaVars, distance = {}, 0
+        doesFit1, schemaVars, distance = fred(fitsWithin(a.indexType, b.indexType, fittingSigs=fittingSigs), schemaVars, distance)
+        if not doesFit1: return DOES_NOT_FIT
+        doesFit2, schemaVars, distance = fred(fitsWithin(a.mappedType, b.mappedType, fittingSigs=fittingSigs), schemaVars, distance)
+        if not doesFit2: return DOES_NOT_FIT
+        return Fits(True, schemaVars, distance)
 
     else:
         raise ProgrammerError(f'Unhandled case {a} <: {b}')
+
+
+def fred(fits, schemaVars, distance):
+    if not fits.fits:
+        return False, schemaVars, distance
+    s, d = updateSchemaVarsWith(schemaVars, distance, fits)
+    return fits.fits, s, d
 
 
 def _inject(xs, acc, fn):
@@ -615,12 +669,12 @@ def _anyExplicit(ts):
             return True
     return False
 
-def _processA_(a_, cacheId, tByT, lenWeakenings):
+def _processA_(a_, schemaVars, lenWeakenings):
     spaceCount = 0
     for ta in a_:
         if isinstance(ta, BType):
             if ta.explicit:
-                return (cacheId, False, Missing, Missing)
+                return DOES_NOT_FIT
             elif (root := ta.rootSpace):
                 # OPEN: needs doing properly
                 spaceCount += 1
@@ -632,18 +686,20 @@ def _processA_(a_, cacheId, tByT, lenWeakenings):
         except:
             print("ponder some more")
             # raise BTypeError("OPEN: Needs description")
-    return (cacheId, True, tByT, len(a_) + lenWeakenings)
+    return Fits(True, schemaVars, len(a_) + lenWeakenings)
 
-# def _processA_(a_, cacheId, tByT, lenWeakenings):
+
+# prior to 2025.05.25
+# def _processA_(a_, schemaVars, lenWeakenings):
 #     exclusiveCount = 0
 #     for ta in a_:
 #         if isinstance(ta, BType):
 #             if ta.familial:
 #                 implicitWeakenings = [tw for tw in _weakenings.get(ta, ()) if tw in _implicitTypes]
 #                 if not implicitWeakenings:
-#                     return (cacheId, False, Missing, Missing)
+#                     return DOES_NOT_FIT
 #             elif ta.explicit:
-#                 return (cacheId, False, Missing, Missing)
+#                 return DOES_NOT_FIT
 #             elif ta.space:
 #                 # OPEN: needs doing properly
 #                 exclusiveCount += 1
@@ -651,38 +707,30 @@ def _processA_(a_, cacheId, tByT, lenWeakenings):
 #             exclusiveCount += 1
 #     if exclusiveCount > 1:
 #         raise BTypeError("OPEN: Needs description")
-#     return (cacheId, True, tByT, len(a_) + lenWeakenings)
+#     return Fits(True, schemaVars, len(a_) + lenWeakenings)
 
-def cacheAndUpdate(result, tByT, distance=Missing):
-    cacheId, doesFit, tByTNew, distance_ = result
-    if doesFit:
-        if distance is Missing:
-            distance = distance_
-        elif distance_ is Missing:
-            # MUSTDO get to bottom of this
-            distance = distance
+
+def updateSchemaVarsWith(runningSchemaVars, runningDistance, result):
+    resultFits, resultSVRs, resultDistance = result
+    if not resultFits: raise ValueError(f'Can only update schemaVars when a <: b which is not the case here')
+    runningSchemaVars = dict(runningSchemaVars)
+    for TNew, tNew in resultSVRs.items():
+        if TNew is T:
+            continue   # OPEN: implies that T cannot be part of a schema only a general placeholder. ponder this some more
+        if (tRunning := runningSchemaVars.get(TNew, Missing)) is Missing:
+            runningSchemaVars[TNew] = tNew
+        elif tNew != tRunning:
+            weakened = False
+            if tRunning not in _weakenings.get(tNew, ()):
+                if tNew in _weakenings.get(tRunning, ()):
+                    runningSchemaVars[TNew] = tNew
+                    weakened = True
+            if not weakened:
+                raise SchemaError(f'{TNew} could be {tRunning} or {tNew} but currently we don\'t support analysing conflicting schema vars - can be probably be done with unions')
         else:
-            distance = distance + distance_
-    if cacheId:
-        _fitsCache[cacheId] = doesFit, tByTNew, distance
-    if doesFit and tByTNew:
-        updates = {}
-        for TNew, tNew in tByTNew.items():
-            if TNew is not T:
-                t = tByT.get(TNew, Missing)
-                if t is not Missing:
-                    if tNew is not t and t not in _weakenings.get(tNew, ()):
-                        if tNew in _weakenings.get(t, ()):
-                            updates[TNew] = tNew
-                        else:
-                            doesFit = False
-                            break
-                else:
-                    updates[TNew] = tNew
-        if doesFit and updates:
-            tByT = dict(tByT)
-            tByT.update(updates)
-    return doesFit, tByT, distance
+            # no change
+            pass
+    return runningSchemaVars, runningDistance + resultDistance
 
 
 def _partitionIntersectionTLs(A:tuple, B:tuple):
@@ -755,23 +803,24 @@ def _partitionIntersectionTLs(A:tuple, B:tuple):
     return outA, outAB, outB, weakenings
 
 
-def _partitionIntersectionTLsWithTInRhs(a:tuple, b:tuple, TRACE=False, fittingSigs=False):
+def _partitionIntersectionTLsWithTInRhs(a:tuple, b:tuple, *, fittingSigs):
     ab = []
     potentialsByA, potentialsByB = {}, {}
     remainingATypes = list(a)
     remainingBTypes = list(b)
     for ai, ta in enumerate(remainingATypes):
         for bi, tb in enumerate(remainingBTypes):
-            doesFit, tByT, distance = cacheAndUpdate(fitsWithin(ta, tb, TRACE, fittingSigs), {}, 0)  # handles weakenings
-            if doesFit:
+            fits = fitsWithin(ta, tb, fittingSigs=fittingSigs)
+            if fits:
+                schemaVars, distance = updateSchemaVarsWith({}, 0, fits)  # handles weakenings
                 if distance == 0:
-                    ab.append((ta, tb, tByT, 0))
+                    ab.append((ta, tb, schemaVars, 0))
                     remainingATypes[ai] = Missing
                     del remainingBTypes[bi]
                     break
                 else:
-                    potentialsByA.setdefault(ta, []).append((tb, tByT, distance))
-                    potentialsByB.setdefault(tb, []).append((ta, tByT, distance))
+                    potentialsByA.setdefault(ta, []).append((tb, schemaVars, distance))
+                    potentialsByB.setdefault(tb, []).append((ta, schemaVars, distance))
     # if any bt fits more than one a we might have a problem
     # but for the moment just check that each potential A and B has length 1
     a_ = {at:at for at in remainingATypes if at is not Missing}
@@ -780,8 +829,8 @@ def _partitionIntersectionTLsWithTInRhs(a:tuple, b:tuple, TRACE=False, fittingSi
         if len(potentials) > 1:
             raise NotYetImplemented()
         else:
-            tb, tByT, distance = potentials[0]
-            ab.append((ta, tb, tByT, distance))
+            tb, schemaVars, distance = potentials[0]
+            ab.append((ta, tb, schemaVars, distance))
             del a_[ta]
     for tb, potentials in potentialsByB.items():
         if len(potentials) > 1:
@@ -842,6 +891,6 @@ def _find(needle, haystack):
     except:
         return -1
 
-def determineRetType(md, tByT, sigCaller):
+def determineRetType(md, schemaVars, sigCaller):
     raise NotYetImplemented()
 

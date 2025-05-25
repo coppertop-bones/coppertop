@@ -54,6 +54,10 @@ def _ensureErrors():
         class UnhappyWomble(CPTBError): pass
         sys._UnhappyWomble = UnhappyWomble
 
+    if not hasattr(sys, '_WTF'):        # polite interpretation of pls - What The Flip, What The Frac
+        class WTF(CPTBError): pass
+        sys._WTF = WTF
+
 
 _ensureErrors()
 CPTBError = sys._CPTBError
@@ -61,6 +65,7 @@ ProgrammerError = sys._ProgrammerError
 NotYetImplemented = sys._NotYetImplemented
 PathNotTested = sys._PathNotTested
 UnhappyWomble = sys._UnhappyWomble
+WTF = sys._WTF
 
 class DocumentationError(Exception): pass
 

@@ -127,12 +127,18 @@ class BType(BTypeRoot):
         elif hasattr(instance, '_asT'):
             # the instance has a coercion method
             return instance._asT(self)
-        elif self._coercer:
-            # type has a coercer
-            return self._coercer(self, instance)
         else:
-            msg = f'{instance} can\'t be coerced to <:{self}> - instance has no _asT, type has no _coercer'
-            raiseLess(BTypeError(msg, ErrSite(self.__class__)))
+            if (coercer := self._coercer) is Missing:
+                if isinstance(self, BTIntersection):
+                    # if we are an intersection type then check if one is in the intersection's types
+                    for t in self.types:
+                        if (coercer := t._coercer) is not Missing:
+                            break
+            if coercer:
+                return coercer(self, instance)
+            else:
+                msg = f'{instance} can\'t be coerced to <:{self}> - instance has no _asT, type (or intersections types) has no _coercer'
+                raiseLess(BTypeError(msg, ErrSite(self.__class__)))
 
     # INSTANCE CONSTRUCTION
 
