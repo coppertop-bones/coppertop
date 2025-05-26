@@ -1,33 +1,14 @@
 # **********************************************************************************************************************
-#
-#                             Copyright (c) 2019-2022 David Briant. All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
-# following conditions are met:
-#
-# 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following
-#    disclaimer.
-#
-# 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
-#    following disclaimer in the documentation and/or other materials provided with the distribution.
-#
-# 3. All advertising materials mentioning features or use of this software must display the following acknowledgement:
-#    This product includes software developed by the copyright holders.
-#
-# 4. Neither the name of the copyright holder nor the names of the  contributors may be used to endorse or promote
-#    products derived from this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
-# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-# WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
+# Copyright 2025 David Briant, https://github.com/coppertop-bones. Licensed under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance with the License. You may obtain a copy of the  License at
+# http://www.apache.org/licenses/LICENSE-2.0. Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY  KIND,
+# either express or implied. See the License for the specific language governing permissions and limitations under the
+# License. See the NOTICE file distributed with this work for additional information regarding copyright ownership.
 # **********************************************************************************************************************
 
-import sys, inspect
+import sys, types, typing
+
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 
@@ -43,19 +24,42 @@ def _ensureSentinels():
 
     # something should / could be there but it is definitely not there
     if not hasattr(sys, '_Missing'):
-        class Missing(object):
+        # OPEN: add a metaclass
+        class Missing:
             def __bool__(self):
                 return False
             def __repr__(self):
                 # for pretty display in pycharm debugger
                 return 'Missing'
+            def __or__(self, other):
+                # see https://peps.python.org/pep-0604/
+                if (
+                        isinstance(other, type) or
+                        (t := typing.get_origin(other) is typing.Union) or
+                        t is types.UnionType
+                ):
+                    return typing.Union[type(self), other]
+                else:
+                    return NotImplemented
+            def __ror__(self, other):
+                # see https://peps.python.org/pep-0604/
+                if (
+                        isinstance(other, type) or
+                        (t := typing.get_origin(other) is typing.Union) or
+                        t is types.UnionType
+                ):
+                    return typing.Union[type(self), other]
+                else:
+                    return NotImplemented
         sys._Missing = Missing()
         sys._Missing._t = sys._Missing
 
 
     # the null set
     if not hasattr(sys, '_NULL'):
-        class _NULL(object):
+        class _NULL:
+            def __bool__(self):
+                return False
             def __repr__(self):
                 # for pretty display in pycharm debugger
                 return 'Null'
@@ -66,7 +70,7 @@ def _ensureSentinels():
     # explaining what it is? at min it's not hard to do "There's an emergency going on" | +err >> signal
     # possibly in prototype code you could do Err >> signal, but why not Null | +err >> signal
     if not hasattr(sys, '_ERR'):
-        class _ERR(object):
+        class _ERR:
             def __repr__(self):
                 # for pretty display in pycharm debugger
                 return 'Err'
@@ -77,7 +81,7 @@ def _ensureSentinels():
     # undetectable and has no place in code - just as part of the
     # building process
     if not hasattr(sys, '_VOID'):
-        class _VOID(object):
+        class _VOID:
             def __bool__(self):
                 return False
             def __repr__(self):
@@ -92,7 +96,7 @@ def _ensureSentinels():
 
     # Just to indicate we are exiting early rather than ensuring if statements are fully complete
     if not hasattr(sys, '_ExitEarly'):
-        class EarlyExit(object):
+        class EarlyExit:
             def __bool__(self):
                 return False
             def __repr__(self):
@@ -119,6 +123,7 @@ str = type("hello")
 bool = type(True)
 classType = type(object)
 list_iter = type(iter([]))
+generator = type((x for x in []))
 
 
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__ + ' - done')

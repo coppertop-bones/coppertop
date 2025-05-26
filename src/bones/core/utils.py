@@ -1,30 +1,10 @@
 # **********************************************************************************************************************
-#
-#                             Copyright (c) 2012-2022 David Briant. All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
-# following conditions are met:
-#
-# 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following
-#    disclaimer.
-#
-# 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
-#    following disclaimer in the documentation and/or other materials provided with the distribution.
-#
-# 3. All advertising materials mentioning features or use of this software must display the following acknowledgement:
-#    This product includes software developed by the copyright holders.
-#
-# 4. Neither the name of the copyright holder nor the names of the  contributors may be used to endorse or promote
-#    products derived from this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
-# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-# WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
+# Copyright 2025 David Briant, https://github.com/coppertop-bones. Licensed under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance with the License. You may obtain a copy of the  License at
+# http://www.apache.org/licenses/LICENSE-2.0. Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY  KIND,
+# either express or implied. See the License for the specific language governing permissions and limitations under the
+# License. See the NOTICE file distributed with this work for additional information regarding copyright ownership.
 # **********************************************************************************************************************
 
 import sys
@@ -63,14 +43,15 @@ def raiseLess(ex, includeMe=True):
         if fullname == '__main__.<module>': break
     hasPydev = False
     hasIPython = False
-    while True:
-        # frame = sys._getframe(depth)
-        frame = frame.f_back
-        if not frame: break
-        fullname = frame.f_globals['__name__'] + '.' + frame.f_code.co_name
-        # print(fullname)
-        if fullname.startswith("pydevd"): hasPydev = True
-        if fullname.startswith("IPython"): hasIPython = True
+    if frame:
+        while True:
+            # frame = sys._getframe(depth)
+            frame = frame.f_back
+            if not frame: break
+            fullname = frame.f_globals['__name__'] + '.' + frame.f_code.co_name
+            # print(fullname)
+            if fullname.startswith("pydevd"): hasPydev = True
+            if fullname.startswith("IPython"): hasIPython = True
     if hasPydev or hasIPython:
         raise ex.with_traceback(tb) from None
     else:
@@ -102,7 +83,7 @@ def HookStdOutErrToLines():
         sys.stdout, sys.stderr = oldout, olderr
 
 
-class _StreamToLines(object):
+class _StreamToLines:
     def __init__(self):
         self.lines = []
         self.textBuffer = ""
@@ -114,31 +95,3 @@ class _StreamToLines(object):
                 self.lines.append(self.textBuffer)
                 self.textBuffer = ""
             self.textBuffer += splits[-1:][0]
-
-
-class assertRaises(object):
-
-    def __init__(self, expectedExceptionType):
-        self.expectedExceptionType = expectedExceptionType
-        self.exceptionType = None
-        self.exceptionValue = None
-        self.tb = None
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exceptionType, exceptionValue, tb):
-        self.exceptionType = exceptionType
-        self.exceptionValue = exceptionValue
-        self.tb = tb
-        if exceptionType is None:
-            # no exception was raised
-            raise AssertionError("No exception raised, %s expected." % self.expectedExceptionType)        # no error was raised
-        elif not issubclass(exceptionType, self.expectedExceptionType):
-            # the wrong exception was raised
-            # print the tb to make it easier to figure why the test is failing
-            traceback.print_tb(tb)
-            raise AssertionError("%s raised. %s expected." % (exceptionType, self.expectedExceptionType))
-        else:
-            # the correct error was raised
-            return True

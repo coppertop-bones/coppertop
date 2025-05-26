@@ -7,21 +7,38 @@
 # License. See the NOTICE file distributed with this work for additional information regarding copyright ownership.
 # **********************************************************************************************************************
 
-from bones.core.sentinels import Missing
-from bones.lang.types import unary
+import traceback
 
-# keep the contexts on the kernel to relieve the burden of type memory management from the storage manager
-
-class BaseKernel:
-    __slots__ = ['ctxs', 'sm', 'modByPath', 'styleByName']
-    def __init__(self, sm):
-        self.ctxs = {}
-        self.sm = sm
-        self.modByPath = {}
-        self.styleByName = {}
-
-    def styleForName(self, name):
-        return self.styleByName.get(name, unary)
+def ctxLabel(ctx):
+    label = type(ctx).__name__
+    if label.endswith('Context'): label = label[:-7].lower()
+    return label
 
 
-kernelForCoppertop = BaseKernel(Missing)
+class OnErrorRollback:
+
+    def __init__(self, tm):
+        self.tm = tm
+        self.et = None
+        self.ev = None
+        self.tb = None
+
+    def __enter__(self):
+        self.tm.checkpoint()
+        return self
+
+    def __exit__(self, et, ev, tb):
+        self.et = et
+        self.ev = ev
+        self.tb = tb
+        if et is None:
+            # no exception was raised
+            self.tm.commit()
+            return True
+        else:
+            # # print the tb to make it easier to figure what happened
+            # print('---------------- OnErrorRollback -----------------')
+            # print(''.join(traceback.format_exception(ev)))
+            # print('--------------------------------------------------')
+            self.tm.rollback()
+            raise ev

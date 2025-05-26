@@ -129,3 +129,17 @@ dmypy.json
 .pyre/
 
 .DS_Store
+cmake-build-debug/
+.idea/
+
+#executables
+tdd_buckets
+tdd_mt
+tdd_om
+tdd_om.dSYM/
+tdd_sm
+tdd_tp
+
+tdd_sm.dSYM/
+tdd_tm.dSYM/
+tdd_tm

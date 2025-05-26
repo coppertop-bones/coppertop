@@ -1,118 +1,62 @@
 # **********************************************************************************************************************
-#
-#                             Copyright (c) 2011-2021 David Briant. All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
-# following conditions are met:
-#
-# 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following
-#    disclaimer.
-#
-# 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
-#    following disclaimer in the documentation and/or other materials provided with the distribution.
-#
-# 3. All advertising materials mentioning features or use of this software must display the following acknowledgement:
-#    This product includes software developed by the copyright holders.
-#
-# 4. Neither the name of the copyright holder nor the names of the  contributors may be used to endorse or promote
-#    products derived from this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
-# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-# WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
+# Copyright 2025 David Briant, https://github.com/coppertop-bones. Licensed under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance with the License. You may obtain a copy of the  License at
+# http://www.apache.org/licenses/LICENSE-2.0. Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY  KIND,
+# either express or implied. See the License for the specific language governing permissions and limitations under the
+# License. See the NOTICE file distributed with this work for additional information regarding copyright ownership.
 # **********************************************************************************************************************
 
 import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 
-# define the types here that are needed by the language itself
-
+# just the types needed by the bones itself
 
 __all__ = [
     'noun', 'nullary', 'unary', 'binary', 'ternary',
-    'obj',
+    'mem',
     'TBI', 'void', 'null',
-    'litint', 'litdec', 'littxt', 'litsym', 'litsyms', 'litdate',
-    'btup', 'bstruct', 'bseq', 'bmap', 'bframe',
+    'tup', 'struct', 'frame',
+    'litint', 'litdec', 'littxt', 'litsym', 'litsyms', 'litdate', 'litframe', 'littup', 'litstruct',
 ]
 
 from bones.core.sentinels import Null, Void
-from bones.lang.metatypes import BTAtom, BType
+from bones.ts.metatypes import BTAtom, BType
 
+mem = BType('mem')
+noun = BTAtom("noun")
+nullary = BTAtom("nullary")
+unary = BTAtom("unary")
+binary = BTAtom("binary")
+ternary = BTAtom("ternary")
 
-noun = BTAtom.define("noun")
-nullary = BTAtom.define("nullary")
-unary = BTAtom.define("unary")
-binary = BTAtom.define("binary")
-ternary = BTAtom.define("ternary")
-# rau = BTAtom.define("rau")
-
-# obj is used in setOrthogonal to show the type and an object of some sort and thus the intersection with
-# other orthogonal(obj) types is uninhabited
-obj = BTAtom.define("obj")
-
-TBI = BTAtom.define("TBI").setOrthogonal(obj)
-void = BTAtom.define('void').setOrthogonal(obj)     # something that isn't there and shouldn't be there
-null = BTAtom.define('null')                        # the null set - something that isn't there and that's okay
+TBI = BTAtom("TBI", space=mem)
+void = BTAtom('void', space=mem)        # something that isn't there and shouldn't be there
+null = BTAtom('null')                   # the null set - something that isn't there and that's okay
 
 Null._t = null
 Void._t = void
 
+# bones allows for literal frames, tuples and structs and since we would like to have multiple implementations, for
+# example pandas and polars etc, we need root types to derive from.
+tup = BTAtom('tup')
+struct = BTAtom('struct')
+frame = BTAtom('frame')
 
-# types used in parser
-litint = BTAtom.define('litint').setOrthogonal(obj)
-litdec = BTAtom.define('litdec').setOrthogonal(obj)
-littxt = BTAtom.define('littxt').setOrthogonal(obj)      # this allows us to provide different encodings in source and map to the core one
-litsym = BTAtom.define('litsym').setOrthogonal(obj)
-litsyms = BTAtom.define('litsyms').setOrthogonal(obj)
-litdate = BTAtom.define('litdate').setOrthogonal(obj)
+litint = BTAtom('litint', space=mem)
+litdec = BTAtom('litdec', space=mem)
+littxt = BTAtom('littxt', space=mem)
+litsym = BTAtom('litsym', space=mem)
+litsyms = BTAtom('litsyms', space=mem)
+litdate = BTAtom('litdate', space=mem)
+littup = BType('littup: littup & tup in mem')
+litstruct = BType('litstruct: litstruct & struct in mem')
+litframe = BType('litframe: litframe & frame in mem')
 
-# types for the implementation classes
-btup = BTAtom.define('btup').setOrthogonal(obj)
-bstruct = BTAtom.define('bstruct').setOrthogonal(obj)
-bseq = BTAtom.define('bseq').setOrthogonal(obj)
-bmap = BTAtom.define('bmap').setOrthogonal(obj)
-bframe = BTAtom.define('bframe').setOrthogonal(obj)
-
-
-def _addConstructors():
-    from bones.lang.structs import tvarray, bstruct_, bseq_, bmap_, bframe_
-    import bones.lang.structs
-    btup.setConstructor(tvarray)
-    bstruct.setConstructor(bstruct_)
-    bseq.setConstructor(bseq_)
-    bmap.setConstructor(bmap_)
-    bframe.setConstructor(bframe_)
-
-    bones.lang.structs.btup = btup
-    bones.lang.structs.bstruct = bstruct
-    bones.lang.structs.bseq = bseq
-    bones.lang.structs.bmap = bmap
-    bones.lang.structs.bframe = bframe
-
-_addConstructors()
-
-
-
-# expose a bunch of schema variables - code can get more via schemaVariableForOrd
 T = BType('T')
-for i in range(1, 21):
+for i in range(1, 10):
     t = BType(f'T{i}')
     locals()[t.name] = t
-for o in range(26):
-    t = BType(f"T{chr(ord('a') + o)}")
-    locals()[t.name] = t
 
-__all__ += [
-    'T',
-    'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10',
-    'T11', 'T12', 'T13', 'T14', 'T15', 'T16', 'T17', 'T18', 'T19', 'T20',
-    'Ta', 'Tb', 'Tc', 'Td', 'Te', 'Tf', 'Tg', 'Th', 'Ti', 'Tj', 'Tk', 'Tl', 'Tm',
-    'Tn', 'To', 'Tp', 'Tq', 'Tr', 'Ts', 'Tt', 'Tu', 'Tv', 'Tw', 'Tx', 'Ty', 'Tz'
-]
+__all__ += ['T','T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9']

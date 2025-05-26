@@ -1,33 +1,15 @@
 # **********************************************************************************************************************
-#
-#                             Copyright (c) 2019-2022 David Briant. All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
-# following conditions are met:
-#
-# 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following
-#    disclaimer.
-#
-# 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
-#    following disclaimer in the documentation and/or other materials provided with the distribution.
-#
-# 3. All advertising materials mentioning features or use of this software must display the following acknowledgement:
-#    This product includes software developed by the copyright holders.
-#
-# 4. Neither the name of the copyright holder nor the names of the  contributors may be used to endorse or promote
-#    products derived from this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
-# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-# WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
+# Copyright 2025 David Briant, https://github.com/coppertop-bones. Licensed under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance with the License. You may obtain a copy of the  License at
+# http://www.apache.org/licenses/LICENSE-2.0. Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY  KIND,
+# either express or implied. See the License for the specific language governing permissions and limitations under the
+# License. See the NOTICE file distributed with this work for additional information regarding copyright ownership.
 # **********************************************************************************************************************
 
 import sys
+if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
+
 from contextlib import contextmanager as _contextmanager
 from bones.core.sentinels import Missing
 from bones.core.errors import ProgrammerError
@@ -41,20 +23,17 @@ if not hasattr(sys, '_ContextStack'):
 # context
 # **********************************************************************************************************************
 
-class _Context(object):
+class _Context:
 
     def __call__(self, *args, **kwargs):
-        if args:
-            if len(args) > 1: raise ProgrammerError(f'Can only get one context value at a time, but {args} was requested')
-            # get context
-
-        else:
-            return _setContext(**kwargs)
+        if args and len(args) > 1: raise ProgrammerError(f'Can only get one context value at a time, but {args} was requested')
+        return _setContext(**kwargs)
 
     def __getattr__(self, name):
         return sys._ContextStack.get(name, [Missing])[-1]
 
     def __setattr__(self, name, value):
+        # if there is no context for the name, i.e.  established via with `context(name=val):`, then this have no effect
         sys._ContextStack.get(name, [Missing])[-1] = value
 
 
@@ -74,3 +53,23 @@ def _setContext(*args, **kwargs):
                 del sys._ContextStack[k]
 
 context = _Context()
+
+def _PP(x):
+    print(str(x))
+    return x
+
+def _EE(x):
+    print(str(x), file = sys.stderr)
+    return x
+
+sys._ContextStack.setdefault('PP', []).append(_PP)
+sys._ContextStack.setdefault('NB', []).append(_EE)
+sys._ContextStack.setdefault('EE', []).append(_EE)
+
+if __name__ == '__main__':
+    with context(fred=1):
+        assert context.fred == 1
+        context.fred += 1
+        assert context.fred == 2
+    assert context.fred is Missing
+    print('pass')

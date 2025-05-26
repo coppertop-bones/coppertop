@@ -7,21 +7,46 @@
 # License. See the NOTICE file distributed with this work for additional information regarding copyright ownership.
 # **********************************************************************************************************************
 
-from bones.core.sentinels import Missing
-from bones.lang.types import unary
-
-# keep the contexts on the kernel to relieve the burden of type memory management from the storage manager
-
-class BaseKernel:
-    __slots__ = ['ctxs', 'sm', 'modByPath', 'styleByName']
-    def __init__(self, sm):
-        self.ctxs = {}
-        self.sm = sm
-        self.modByPath = {}
-        self.styleByName = {}
-
-    def styleForName(self, name):
-        return self.styleByName.get(name, unary)
+import sys
+if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 
-kernelForCoppertop = BaseKernel(Missing)
+from bones.ts._type_lang.jones_type_manager import BTypeError
+
+
+bmtnul = 0      # i.e. not initialised yet
+bmtatm = 1      # snuggled in the highest nibble in the type's metadata, i.e. 0x1000_0000
+
+bmtint = 2
+bmtuni = 3
+
+bmttup = 4
+bmtstr = 5
+bmtrec = 6
+
+bmtseq = 7
+bmtmap = 8
+bmtfnc = 9
+
+bmtsvr = 10
+
+
+bmtnameById = {
+    bmtnul: 'TBC',
+    bmtatm: 'Atom',
+    bmtint: 'Inter',
+    bmtuni: 'Union',
+    bmttup: 'Tuple',
+    bmtstr: 'Struct',
+    bmtrec: 'Rec',
+    bmtseq: 'Seq',
+    bmtmap: 'Map',
+    bmtfnc: 'Fn',
+    bmtsvr: 'T',
+}
+
+
+class TLError(Exception): pass
+class SchemaError(BTypeError): pass
+
+class Constructors(list): pass

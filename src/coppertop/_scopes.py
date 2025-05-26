@@ -1,31 +1,12 @@
 # **********************************************************************************************************************
-#
-#                             Copyright (c) 2011-2022 David Briant. All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
-# following conditions are met:
-#
-# 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following
-#    disclaimer.
-#
-# 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
-#    following disclaimer in the documentation and/or other materials provided with the distribution.
-#
-# 3. All advertising materials mentioning features or use of this software must display the following acknowledgement:
-#    This product includes software developed by the copyright holders.
-#
-# 4. Neither the name of the copyright holder nor the names of the  contributors may be used to endorse or promote
-#    products derived from this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
-# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-# WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
+# Copyright 2025 David Briant, https://github.com/coppertop-bones. Licensed under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance with the License. You may obtain a copy of the  License at
+# http://www.apache.org/licenses/LICENSE-2.0. Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY  KIND,
+# either express or implied. See the License for the specific language governing permissions and limitations under the
+# License. See the NOTICE file distributed with this work for additional information regarding copyright ownership.
 # **********************************************************************************************************************
+
 
 import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
@@ -40,6 +21,9 @@ _numCopies = 0
 _numNotCopied = 0
 
 
+ANON_NAME = "<anon>"
+ROOT_NAME = "<root>"
+
 
 # **********************************************************************************************************************
 # _CoWScope - copy on write - https://stackoverflow.com/questions/628938/what-is-copy-on-write
@@ -48,7 +32,7 @@ _numNotCopied = 0
 def _targetCount(p):
     return c_long.from_address(p._targetId).value
 
-class _CoWProxy(object):
+class _CoWProxy:
     __slots__ = ['_parentProxy', '_k', '_target', '_targetId']
 
     def __init__(self, parentProxy, k, target):
@@ -216,8 +200,8 @@ class _CoWProxy(object):
 # to decrease any ref count object deletion must be detected thus we need to create an object on access - this is
 # the cost of the optimisation in Python
 
-class _CoWScope(object):
-    _slots__ = ['_vars']
+class _CoWScope:
+    _slots__ = ['_vars', '_name']
 
     def __init__(self):
         super().__setattr__('_vars', {})
@@ -250,19 +234,20 @@ class _CoWScope(object):
         # for pretty display in pycharm debugger
         return f"TBC{{{','.join(super().__getattribute__('_vars'))}}}"
 
-    def _setAttr(self, k, v):
-        super().__getattribute__('_vars')[k] = v
-
     def __dir__(self):
         return list(super().__getattribute__('_vars').keys())
 
+    def _setAttr(self, k, v):
+        super().__getattribute__('_vars')[k] = v
 
-class _ContextualScopeManager(object):
+
+
+class _ContextualScopeManager:
     __slots__ = ['_current', '_namedScopes']
 
     def __init__(self):
         super().__setattr__('_namedScopes', {})
-        super().__setattr__('_current', _MutableContextualScope(self, Missing, "<root>"))
+        super().__setattr__('_current', _MutableContextualScope(self, Missing, ROOT_NAME))
 
     def __setattr__(self, k, newValue):
         if k == '_current':
@@ -276,12 +261,22 @@ class _ContextualScopeManager(object):
         else:
             return getattr(super().__getattribute__('_current'), k)
 
+    def __delattr__(self, k):
+        if k in ('_current', '_namedScopes'):
+            raise AttributeError("Can't delete _current or _namedScopes")
+        else:
+            return delattr(super().__getattribute__('_current'), k)
+
     def __repr__(self):
         # for pretty display in pycharm debugger
         return f"TBC{{{','.join(self._current._vars)}}}"
 
+    def __dir__(self):
+        return dir(super().__getattribute__('_current'))
 
-class _MutableContextualScope(object):
+
+
+class _MutableContextualScope:
     _slots__ = ['_vars', '_parent', '_manager', '_name']
 
     def __init__(self, manager, parent, name=Missing):
@@ -305,8 +300,19 @@ class _MutableContextualScope(object):
         else:
             return answer
 
+    def __delattr__(self, k):
+        vars = super().__getattribute__('_vars')
+        if k in vars:
+            del vars[k]
+            return
+        raise AttributeError(k)
+
     def __repr__(self):
-        return f'ContextualScope({"<anon>" if self._name is Missing else self._name})'
+        return f'ContextualScope({ANON_NAME if self._name is Missing else self._name})'
+
+    def __dir__(self):
+        return list(super().__getattribute__('_vars').keys())
+
 
 
 if not hasattr(sys, '_UNDERSCORE'):

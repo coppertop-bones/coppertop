@@ -1,46 +1,33 @@
-## coppertop-bones - partial functions, multi-dispatch and pipeline style for Python
+## coppertop - multiple-dispatch, partial functions and pipeline style for Python
 
-Coppertop provides a bones-style aggregation manipulation experience in Python via the following:
+Coppertop provides an alternative programming experience in Python via the following:
 
-* partial (application of) functions
 * multiple-dispatch
+* partial functions
 * piping syntax
-* data focussed type system with atoms, intersections, unions, products, exponentials, overloads and type schemas thus 
-  allowing Python to be a library implementation language for bones
-* an embryonic [core library](https://github.com/DangerMouseB/coppertop-bones/tree/main/src/dm) of common functions 
-
+* an embryonic [core library](https://github.com/coppertop-bones/dm/tree/main/src/dm) of common functions
 
 <br>
 
-### Partial (application of) functions
 
-By decorating a function with @coppertop (and importing _) we can easily create partial functions, for example:
+### Installation
 
-syntax: `f(_, a)` -> `f(_)`  \
-where `_` is used as a sentinel place-holder for arguments yet to be confirmed (TBC)
+OUT-OF-ORDER\
+`pip install coppertop-bones-dm` for the dm core library and the @coppertop decorator.\
+`pip install coppertop` just for the @coppertop decorator.
+
+At the moment needs to be git cloned and the setup.py manually run.
+
+<br>
+
+### Multiple-dispatch
+
+To use multiple-dispatch decorate functions with @coppertop and use different type annotations. Missing annotations 
+are taken as fallback wildcards. Class inheritance is ignored when matching caller and function signatures.
 
 ```
 from coppertop.pipe import *
 
-@coppertop
-def appendStr(x, y):
-    assert isinstance(x, str) and isinstance(y, str)
-    return x + y
-
-appendWorld = appendStr(_, " world!")
-
-assert appendWorld("hello") == "hello world!"
-```
-
-<br>
-
-
-### Multiple-dispatch
-
-Just redefine functions with different type annotations. Missing annotations are taken as 
-fallback wildcards. Class inheritance is ignored when matching caller and function signatures.
-
-```
 @coppertop
 def addOne(x:int) -> int:
     return x + 1
@@ -64,11 +51,34 @@ assert addOne([0]) == [0, 1]
 <br>
 
 
+### Partial (application of) functions
+
+syntax: `f(_, a)` -> `f(_)`  \
+where `_` is used as a sentinel place-holder for arguments yet to be confirmed (TBC)
+
+We create partials of @coppertop decorated functions when we use _ indicating deferred arguments. For example:
+
+```
+from coppertop.pipe import *
+
+@coppertop
+def appendStr(x, y):
+    assert isinstance(x, str) and isinstance(y, str)
+    return x + y
+
+appendWorld = appendStr(_, " world!")           # first argument is deferred
+
+assert appendWorld("hello") == "hello world!"
+```
+
+<br>
+
+
 ### Piping syntax
 
 The @coppertop function decorator also extends functions with the `>>` operator
 and so allows code to be written in a more essay style format - i.e. left-to-right and 
-top-to-bottom. The idea is to make it easy to express the syntax (aka sequence) of a solution.
+top-to-bottom. The idea is to make it easier to express program syntax (aka sequence).
 
 
 <br>
@@ -92,14 +102,13 @@ def addOne(x):
 
 <br>
 
-#### binary style - takes 2 piped argument and 0+ called arguments
+#### binary style - takes 2 piped arguments and 0+ called arguments
 
 syntax: `A >> f(args) >> B` -> `f(args)(A, B)`
 
 ```
 from bones.core.errors import NotYetImplemented
-import dm.core
-from coppertop import collect, inject
+from dm.core import collect, inject
 
 @coppertop(style=binary)
 def add(x, y):
@@ -120,12 +129,14 @@ def op(x, action, y):
 
 <br>
 
-#### ternary style - takes 3 piped argument and 0+ called arguments
+
+#### ternary style - takes 3 piped arguments and 0+ called arguments
 
 syntax: `A >> f(args) >> B >> C` -> `f(args)(A, B, C)`
 
 ```
-from coppertop import both, check, equal
+from dm.core import both
+from dm.testing immport check, equals
 
 actual = [1,2] >> both >> (lambda x, y: x + y) >> [3,4]
 assert (1 >> equal >> 1) == True
@@ -134,9 +145,34 @@ actual >> check >> equal >> [4, 6]
 
 <br> 
 
-#### as an exercise for the reader
+
+### Examples
+
+#### Bag of M&Ms problem 
+
+In [Why coppertop - MM problem from Think Bayes.ipynb](
+https://github.com/coppertop-bones/dm/blob/main/jupyter/Why%20coppertop%20-%20MM%20problem%20from%20Think%20Bayes.ipynb
+) we implement a coppertop solution to the problem and silently introduce intersection types.
+
+#### Cluedo notepad
+
+See [algos.py](
+https://github.com/coppertop-bones/dm/blob/main/examples/dm/examples/cluedo/algos.py
+), where we track a game of Cluedo and infer who did it. See [ex_games.py](
+https://github.com/coppertop-bones/dm/blob/main/examples/dm/examples/cluedo/ex_games.py
+) and [cluedo-pad.ipynb](
+https://github.com/coppertop-bones/dm/blob/main/jupyter/cluedo-pad.ipynb
+) for example game input and notepad output.
+
+<br>
+
+
+### a whimsical exercise for the ambitious
+
+(both, collect, inject, addOne, appendStr, check, equals are all illustrated above)
+
 ```
-from coppertop import to
+from dm.core import to
 [1,2] >> both >> (lambda x, y: x + y) >> [3,4] 
    >> collect >> (lambda x: x * 2)
    >> inject(_,1,_) >> (lambda x,y: x * y)
@@ -148,30 +184,42 @@ from coppertop import to
 <br>
 
 
-### Bones type system
-
-As an introduction, consider:
-
-```
-from bones.lang.metatypes import BTAtom, S
-from dm.core.types import num, index, txt, N
-num = BTAtom.ensure('num')      # nominal
-_ccy = BTAtom.ensure('_ccy')    # nominal
-ccy = num & _ccy                # intersection
-ccy + null                      # union
-ccy * index * txt               # tuple (sequence of types)
-S(name=txt, age=num)            # struct
-N ** ccy                        # collection of ccy accessed by an ordinal (N)
-txt ** ccy                      # collection of ccy accessed by a python string
-(num*num) ^ num                 # (num, num) -> num - a function
-T, T1, T2, ...                  # type variable - to be inferred at build time
-```
+### Other
+* [Hadley Wickham on pipes](https://r4ds.had.co.nz/pipes.html)
+* [Comparison of coppertop style with other piped languages](./docs/compare-with-other-piped-languages.md)
 
 <br>
 
+### Thanks
 
-### Example - Cluedo notepad
+#### Inspired by
+* [Magrittr](
+https://magrittr.tidyverse.org/
+) - a piping library for R
+* [Arthur Whitney's](
+https://en.wikipedia.org/wiki/Arthur_Whitney_(computer_scientist)
+) ideas especially [kdb/q](https://code.kx.com/q/) and C style e.g. a [tiny k interpreter for educational purposes](
+https://github.com/kparc/ksimple
+)
+* Smalltalk - especially the ideas of [Alan Kay](
+https://en.wikipedia.org/wiki/Alan_Kay
+) & [Rebecca Wirfs-Brock](
+https://en.wikipedia.org/wiki/Rebecca_Wirfs-Brock
+) and the [VisualWorks](
+https://www.cincomsmalltalk.com/main/products/visualworks/
+) and [Cuis](
+https://cuis.st/
+) implementations
+* [Alexander A. Stepanov's](
+http://stepanovpapers.com/
+) ideas on templating and generics
 
-See [algos.py](https://github.com/DangerMouseB/coppertop-bones-demo/blob/main/src/dm/examples/cluedo/algos.py), where 
-we track a game of Cluedo and infer who did it. See [games.py](https://github.com/DangerMouseB/coppertop-bones-demo/blob/main/src/dm/examples/cluedo/games.py) 
-for example game input.
+#### Built using
+
+<p><a href="https://www.jetbrains.com/pycharm/">
+<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/PyCharm.svg" width="200" height="100">
+</a></p>
+
+<p><a href="https://www.jetbrains.com/clion/">
+<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/CLion.svg" width="160" height="80">
+</a></p>

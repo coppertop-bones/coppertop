@@ -1,33 +1,16 @@
 # **********************************************************************************************************************
-#
-#                             Copyright (c) 2019-2020 David Briant. All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
-# following conditions are met:
-#
-# 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following
-#    disclaimer.
-#
-# 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
-#    following disclaimer in the documentation and/or other materials provided with the distribution.
-#
-# 3. All advertising materials mentioning features or use of this software must display the following acknowledgement:
-#    This product includes software developed by the copyright holders.
-#
-# 4. Neither the name of the copyright holder nor the names of the  contributors may be used to endorse or promote
-#    products derived from this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
-# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-# WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
+# Copyright 2025 David Briant, https://github.com/coppertop-bones. Licensed under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance with the License. You may obtain a copy of the  License at
+# http://www.apache.org/licenses/LICENSE-2.0. Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY  KIND,
+# either express or implied. See the License for the specific language governing permissions and limitations under the
+# License. See the NOTICE file distributed with this work for additional information regarding copyright ownership.
 # **********************************************************************************************************************
 
-import sys, inspect
+import sys
+if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
+
+import inspect
 
 from bones.core.sentinels import Missing, classType
 
@@ -67,6 +50,10 @@ def _ensureErrors():
         class UnhappyWomble(CPTBError): pass
         sys._UnhappyWomble = UnhappyWomble
 
+    if not hasattr(sys, '_WTF'):        # polite interpretation of pls - What The Flip, What The Frac
+        class WTF(CPTBError): pass
+        sys._WTF = WTF
+
 
 _ensureErrors()
 CPTBError = sys._CPTBError
@@ -74,6 +61,7 @@ ProgrammerError = sys._ProgrammerError
 NotYetImplemented = sys._NotYetImplemented
 PathNotTested = sys._PathNotTested
 UnhappyWomble = sys._UnhappyWomble
+WTF = sys._WTF
 
 class DocumentationError(Exception): pass
 
@@ -91,7 +79,7 @@ class BonesError(Exception):
 
 class SpellingError(BonesError): pass       # lex errors
 
-class ParagraphError(BonesError):           # grouping errors
+class GroupError(BonesError):               # grouping errors
     def __init__(self, msg, errSite, group, token):
         super().__init__(msg, errSite)
         self._group = group
@@ -105,7 +93,7 @@ class DictionaryError(BonesError): pass     # can't find a name in a phrase
 
 class AmbiguousVerbError(BonesError): pass  # aka does not understand, i.e. the necessary overload doesn't exist
 
-class LoadingError(BonesError): pass      # load tool.kit
+class LoadingError(BonesError): pass        # load tool.kit
 
 class ImportError(BonesError): pass         # e.g. from tools.bag import x - x doesn't exist
 
@@ -113,7 +101,7 @@ class ScopeError(BonesError): pass          # e.g. trying to get from or set in 
 
 
 
-class ErrSite(object):
+class ErrSite:
     def __init__(self, *args):
         # args are [class], [id]
         frame = inspect.currentframe()
