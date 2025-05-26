@@ -24,6 +24,7 @@ __all__ = ['BType', 'BTypeError', 'SchemaError', 'extractTypeFromConstructionArg
 
 import itertools, builtins, collections, statistics
 
+import bones.ts._type_lang.jones_type_manager
 from bones.ts._type_lang.jones_type_manager import JonesTypeManager, BType, BTAtom, BTIntersection, BTUnion, \
     BTTuple, BTStruct, BTSeq, BTMap, BTFn, BTSchemaVariable, BTOverload, BTypeError, ppT, _btcls_by_bmtid, \
     extractTypeFromConstructionArgs
@@ -39,8 +40,6 @@ from bones.core.sentinels import Missing, Void, generator
 _verboseNames = False
 
 _idSeed = itertools.count(start=1)              # reserve id 0 as a terminator of a type set
-
-REPL_OVERRIDE_MODE = False
 
 _BTypeByName = {}
 
@@ -128,32 +127,6 @@ def _updateFlagsForIntersection(t, flags, singleSV):
         if (flags.orthogonal and flags.orthogonal is not t) and singleSV:
             raise BTypeError('Can only have one orthogonal in an intersection')
         flags.orthogonal = t
-
-
-class _AddStuff:
-    def __init__(self, t):
-        self.t = t
-    def __ror__(self, instance):    # instance | type
-        return instance | BTIntersection(instance._t if hasattr(instance, '_t') else builtins.type(instance), self.t)
-
-
-class _SubtractStuff:
-    def __init__(self, t):
-        self.t = t
-    def __ror__(self, instance):  # instance | type
-        if not isinstance(t := instance._t if hasattr(instance, '_t') else builtins.type(instance), BTIntersection):
-            raise BTypeError(f'Can only subtract a type from an intersection but LHS type is {t}')
-        a_, ab, b_, weakenings = _partitionIntersectionTLs(
-            t.types,
-            self.t.types if isinstance(self.t, BTIntersection) else (self.t, )
-        )
-        if b_:
-            raise BTypeError(f'RHS is trying to subtract {b_} which isn\'t in the LHS')
-        if not ab:
-            raise ProgrammerError(f'Can\'t end up subtracting nothing')
-        if not a_:
-            raise BTypeError('Left with null set')
-        return instance | (a_[0] if len(a_) == 1 else BTIntersection(*a_))
 
 
 def _anyHasT(*types):
@@ -733,6 +706,7 @@ def _partitionIntersectionTLs(A:tuple, B:tuple):
     outA, outAB, outB = [Missing] * nA, [Missing] * nAB, [Missing] * nB
     oA, oAB, oB = 0, 0, 0
     while True:
+        # tA, tB = _BTypeToPyBType(A[iA]), _BTypeToPyBType(B[iB])     # OPEN: find root cause of why getting a _BType
         tA, tB = A[iA], B[iB]
         idA , idB = _typeId(tA), _typeId(tB)       # if this turns out to be slow we can always just use BTypes
         if idA == idB:
@@ -793,6 +767,9 @@ def _partitionIntersectionTLs(A:tuple, B:tuple):
     # answer  AB', AB, A'B
     return outA, outAB, outB, weakenings
 
+# every now and then we hack as a temporary measure - OPEN: needs doing properly
+bones.ts._type_lang.jones_type_manager._partitionIntersectionTLs = _partitionIntersectionTLs
+bones.ts._type_lang.jones_type_manager._BTypeToPyBType = _BTypeToPyBType
 
 def _partitionIntersectionTLsWithTInRhs(a:tuple, b:tuple, *, fittingSigs):
     ab = []
