@@ -1,14 +1,10 @@
 # **********************************************************************************************************************
-#
-#                             Copyright (c) 2019-2022 David Briant. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance
-# with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
-# on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for
-# the specific language governing permissions and limitations under the License.
-#
+# Copyright 2025 David Briant, https://github.com/coppertop-bones. Licensed under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance with the License. You may obtain a copy of the  License at
+# http://www.apache.org/licenses/LICENSE-2.0. Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY  KIND,
+# either express or implied. See the License for the specific language governing permissions and limitations under the
+# License. See the NOTICE file distributed with this work for additional information regarding copyright ownership.
 # **********************************************************************************************************************
 
 # BY DESIGN
@@ -17,7 +13,7 @@
 #
 # SPEED OPTIONS - SoA style on the list of types, etc - this may also make translation to C easier
 # classes with __slots__ seem to be the fastest
-# if accessing globals becomes an issue could make the whole module a class
+# if accessing globals becomes an issue could make the whole moedule a class
 
 
 import sys
@@ -31,7 +27,7 @@ import itertools, builtins, collections, statistics
 from bones.lang._type_lang.jones_type_manager import JonesTypeManager, BType, BTAtom, BTIntersection, BTUnion, \
     BTTuple, BTStruct, BTSeq, BTMap, BTFn, BTSchemaVariable, BTOverload, BTypeError, ppT, _btcls_by_bmtid, \
     extractTypeFromConstructionArgs
-from bones.typing.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, \
+from bones.ts.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, \
     bmtsvr, bmtnameById, SchemaError
 from bones.lang._type_lang.jones_type_manager import _btypeByClass, _BTypeById     # used by coppertop.pipe - do not remove
 from bones.lang.type_lang import TypeLangInterpreter
@@ -49,6 +45,7 @@ REPL_OVERRIDE_MODE = False
 _BTypeByName = {}
 
 
+class Constructors(list): pass
 
 
 def raiseCantNameBTypeError(this, name, other):
