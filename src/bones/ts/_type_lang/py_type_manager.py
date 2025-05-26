@@ -15,8 +15,8 @@ from bones.jones import BTypeError
 from bones.core.sentinels import Missing
 from bones.core.context import context              # needed for conditional break points whilst debugging
 from bones.core.errors import ProgrammerError, NotYetImplemented
-from bones.lang._type_lang.utils import OnErrorRollback
-from bones.lang._type_lang.fits import fitsWithin
+from bones.ts._type_lang.utils import OnErrorRollback
+from bones.ts._type_lang.fits import fitsWithin
 
 # OPEN: monkey patch the contexts corresponding to ruleNames, i.e. TypeLangParser.Tl_bodyContext, etc with a label
 # property that returns the label of the rule or subrule, e.g. 'tl_body', 'ignore1', etc

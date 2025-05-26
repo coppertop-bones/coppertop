@@ -72,11 +72,11 @@ from bones.core.context import context
 from coppertop._scopes import _CoWProxy, _UNDERSCORE
 from bones.core.errors import ProgrammerError, ErrSite, CPTBError, NotYetImplemented
 from bones.core.sentinels import Missing, function
-from bones.core.utils import firstKey, raiseLess
-from bones.lang.metatypes import BType, fitsWithin as origFitsWithin, BTFn, BTTuple, BTAtom, \
+from bones.core.utils import raiseLess
+from bones.ts.metatypes import BType, fitsWithin as origFitsWithin, BTFn, BTTuple, BTAtom, \
     BTOverload, _BTypeById, _btypeByClass
-from bones.lang.types import nullary, unary, binary, ternary, void
-from bones.lang.select import _ppType, _selectFunction
+from bones.lang.types import nullary, unary, binary, ternary
+from coppertop._select import _ppType, _selectFunction
 from bones.jones import BTypeError
 
 

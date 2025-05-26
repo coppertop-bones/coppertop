@@ -11,7 +11,7 @@ import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 
-from bones.lang._type_lang.jones_type_manager import BTypeError
+from bones.ts._type_lang.jones_type_manager import BTypeError
 
 
 bmtnul = 0      # i.e. not initialised yet

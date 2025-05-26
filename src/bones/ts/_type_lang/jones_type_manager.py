@@ -15,13 +15,13 @@ from bones import jones
 from bones.jones import BTypeError, BType as BTypeRoot
 from bones.ts.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, bmtsvr
 from bones.ts.core import Constructors
-from bones.lang._type_lang.utils import OnErrorRollback
-from bones.lang._type_lang.fits import fitsWithin
+from bones.ts._type_lang.utils import OnErrorRollback
+from bones.ts._type_lang.fits import fitsWithin
 from bones.core.errors import ProgrammerError, NotYetImplemented, PathNotTested
 from bones.core.utils import raiseLess
 from bones.core.errors import ErrSite
 from bones.core.context import context
-from bones.lang.type_lang import TypeLangInterpreter
+from bones.ts.type_lang import TypeLangInterpreter
 
 
 NaT = 0

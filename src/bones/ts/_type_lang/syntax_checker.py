@@ -1,7 +1,7 @@
 import antlr4
 
-from bones.lang._type_lang.TypeLangLexer import TypeLangLexer
-from bones.lang._type_lang.TypeLangParser import TypeLangParser
+from bones.ts._type_lang.TypeLangLexer import TypeLangLexer
+from bones.ts._type_lang.TypeLangParser import TypeLangParser
 
 
 

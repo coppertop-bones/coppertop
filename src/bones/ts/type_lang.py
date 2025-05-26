@@ -13,9 +13,9 @@ from typing import Text
 from bones.jones import BTypeError
 from bones.core.sentinels import Missing
 from bones.ts.core import TLError
-from bones.lang._type_lang.TypeLangLexer import TypeLangLexer
-from bones.lang._type_lang.TypeLangParser import TypeLangParser
-from bones.lang._type_lang.ast_builder import TypeLangAstBuilder
+from bones.ts._type_lang.TypeLangLexer import TypeLangLexer
+from bones.ts._type_lang.TypeLangParser import TypeLangParser
+from bones.ts._type_lang.ast_builder import TypeLangAstBuilder
 
 
 

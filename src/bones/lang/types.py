@@ -11,8 +11,7 @@ import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 
-# define the types here that are needed by the language itself
-
+# just the types needed by the bones itself
 
 __all__ = [
     'noun', 'nullary', 'unary', 'binary', 'ternary',
@@ -23,7 +22,7 @@ __all__ = [
 ]
 
 from bones.core.sentinels import Null, Void
-from bones.lang.metatypes import BTAtom, BType
+from bones.ts.metatypes import BTAtom, BType
 
 mem = BType('mem')
 noun = BTAtom("noun")
@@ -33,24 +32,21 @@ binary = BTAtom("binary")
 ternary = BTAtom("ternary")
 
 TBI = BTAtom("TBI", space=mem)
-void = BTAtom('void', space=mem)      # something that isn't there and shouldn't be there
-null = BTAtom('null')                       # the null set - something that isn't there and that's okay
+void = BTAtom('void', space=mem)        # something that isn't there and shouldn't be there
+null = BTAtom('null')                   # the null set - something that isn't there and that's okay
 
 Null._t = null
 Void._t = void
 
-# so we can have more than one class for frames (and tups and structs, maybe less likely)
-# dframe = frame[dstruct].nameAs('dframe')
-# polarframe = frame[pl.DataFrame].nameAs('polarframe')
+# bones allows for literal frames, tuples and structs and since we would like to have multiple implementations, for
+# example pandas and polars etc, we need root types to derive from.
 tup = BTAtom('tup')
 struct = BTAtom('struct')
 frame = BTAtom('frame')
 
-
-# literal types used in parser
-litint = BTAtom('litint', space=mem)      # OPEN: sort out standard types
+litint = BTAtom('litint', space=mem)
 litdec = BTAtom('litdec', space=mem)
-littxt = BTAtom('littxt', space=mem)      # this allows us to provide different encodings in source and map to the core one
+littxt = BTAtom('littxt', space=mem)
 litsym = BTAtom('litsym', space=mem)
 litsyms = BTAtom('litsyms', space=mem)
 litdate = BTAtom('litdate', space=mem)
@@ -58,21 +54,9 @@ littup = BType('littup: littup & tup in mem')
 litstruct = BType('litstruct: litstruct & struct in mem')
 litframe = BType('litframe: litframe & frame in mem')
 
-
-
-# expose a bunch of schema variables - code can get more via schemaVariableForOrd
 T = BType('T')
 for i in range(1, 10):
     t = BType(f'T{i}')
     locals()[t.name] = t
-# for o in range(26):
-#     t = BType(f"T{chr(ord('a') + o)}")
-#     locals()[t.name] = t
 
-__all__ += [
-    'T',
-    'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', #'T10',
-    # 'T11', 'T12', 'T13', 'T14', 'T15', 'T16', 'T17', 'T18', 'T19', 'T20',
-    # 'Ta', 'Tb', 'Tc', 'Td', 'Te', 'Tf', 'Tg', 'Th', 'Ti', 'Tj', 'Tk', 'Tl', 'Tm',
-    # 'Tn', 'To', 'Tp', 'Tq', 'Tr', 'Ts', 'Tt', 'Tu', 'Tv', 'Tw', 'Tx', 'Ty', 'Tz'
-]
+__all__ += ['T','T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9']
