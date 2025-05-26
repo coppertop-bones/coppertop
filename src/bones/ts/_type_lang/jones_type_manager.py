@@ -717,7 +717,7 @@ class _SubtractStuff:
             return instance | a_[0]
         else:
             new_t = sys._gtm.intersectionNoCheck(a_)
-            return _BTypeToPyBType(new_t)
+            return instance | _ensurePyBType(new_t)
 
 
 
@@ -915,7 +915,7 @@ class JonesTypeManager:
         return self._tm.schemavar(btype=btype or None)
 
     def seq(self, contained, *, btype=Missing):
-        return self._tm.seq(contained, btype=btype or None)
+        return _ensurePyBType(self._tm.seq(contained, btype=btype or None))
 
     def seqT(self, btype):
         return self._tm.seqT(btype)

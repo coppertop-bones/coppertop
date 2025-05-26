@@ -706,7 +706,6 @@ def _partitionIntersectionTLs(A:tuple, B:tuple):
     outA, outAB, outB = [Missing] * nA, [Missing] * nAB, [Missing] * nB
     oA, oAB, oB = 0, 0, 0
     while True:
-        # tA, tB = _BTypeToPyBType(A[iA]), _BTypeToPyBType(B[iB])     # OPEN: find root cause of why getting a _BType
         tA, tB = A[iA], B[iB]
         idA , idB = _typeId(tA), _typeId(tB)       # if this turns out to be slow we can always just use BTypes
         if idA == idB:
@@ -714,17 +713,20 @@ def _partitionIntersectionTLs(A:tuple, B:tuple):
             oAB += 1
             iA += 1
             iB += 1
-            if oAB == nAB or iA == nA or iB == nB: break
+            if oAB == nAB or iA == nA or iB == nB:
+                break
         elif idA < idB:
             outA[oA] = tA
             oA += 1
             iA += 1
-            if oA == nA or iA == nA: break
+            if oA == nA or iA == nA:
+                break
         else:
             outB[oB] = tB
             oB += 1
             iB += 1
-            if oB == nB or iB == nB: break
+            if oB == nB or iB == nB:
+                break
     if (iA + 1) <= nA:
         for iA in range(iA, nA):
             outA[oA] = A[iA]
