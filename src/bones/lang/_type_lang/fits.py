@@ -14,7 +14,24 @@ import collections
 from bones.core.sentinels import Missing
 from bones.core.errors import NotYetImplemented
 
-from bones.lang.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, bmtsvr, bmtnameById
+
+
+bmtnul = 0      # i.e. not initialised yet
+bmtatm = 1      # snuggled in the highest nibble in the type's metadata, i.e. 0x1000_0000
+
+bmtint = 2
+bmtuni = 3
+
+bmttup = 4
+bmtstr = 5
+bmtrec = 6
+
+bmtseq = 7
+bmtmap = 8
+bmtfnc = 9
+
+bmtsvr = 10
+
 
 Fits = collections.namedtuple('Fits', ['fits', 'tByT'])
 Fits.__bool__ = lambda self: self.fits

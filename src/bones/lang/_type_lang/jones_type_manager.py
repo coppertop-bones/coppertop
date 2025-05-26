@@ -14,7 +14,7 @@ from bones.core.sentinels import Missing
 
 from bones import jones
 from bones.jones import BTypeError, BType as BTypeRoot
-from bones.lang.core import TLError, bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, bmtsvr, bmtnameById
+from bones.typing.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, bmtsvr
 from bones.lang.utils import Constructors
 from bones.lang._type_lang.utils import OnErrorRollback
 from bones.lang._type_lang.fits import fitsWithin
@@ -29,6 +29,7 @@ NaT = 0
 _btcls_by_bmtid = {}
 _btypeByClass = {}                   # mappings from python classes to bones types
 _BTypeById = [Missing] * 10000
+
 
 
 def getBTypeForClass(cls):
@@ -123,8 +124,9 @@ class BType(BTypeRoot):
 
     def __ror__(self, instance):  # instance | type   the case of type | type should be caught first below
         if self.hasT:
-            raise BTypeError(f'{self} has a T so cannot be an instance type')
-        elif hasattr(instance, '_asT'):
+            if not sys._fitsWithin(sys._typeOf(instance), self):
+                raise BTypeError(f'{self} has a T so cannot be an instance type')
+        if hasattr(instance, '_asT'):
             # the instance has a coercion method
             return instance._asT(self)
         else:
@@ -137,7 +139,7 @@ class BType(BTypeRoot):
             if coercer:
                 return coercer(self, instance)
             else:
-                msg = f'{instance} can\'t be coerced to <:{self}> - instance has no _asT, type (or intersections types) has no _coercer'
+                msg = f'`{repr(instance)}` can\'t be coerced to <:{self}> - instance has no _asT, type (or intersection\'s types) has no _coercer'
                 raiseLess(BTypeError(msg, ErrSite(self.__class__)))
 
     # INSTANCE CONSTRUCTION
@@ -688,9 +690,16 @@ _btcls_by_bmtid[bmtfnc] = BTFn
 _btcls_by_bmtid[bmtsvr] = BTSchemaVariable
 
 
-
 def ppT(t):
     return (t.__name__, False, False) if isinstance(t, type) else t.ppT()
+
+
+def extractTypeFromConstructionArgs(args):
+    if args and isinstance(args[0], Constructors):
+        t, args = args[0][0], args[1:]
+    else:
+        t = Missing
+    return t, args
 
 
 

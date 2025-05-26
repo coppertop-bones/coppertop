@@ -498,7 +498,7 @@ class _Dispatcher:
                 if fn.typeHelper:
                     tByT = fn.typeHelper(*args, tByT=tByT)
                 # dispatchTime += time.perf_counter_ns() - t4; dispatchCount += 1
-                answer = fn.pyfn(*args, tByT=tByT)
+                ret = fn.pyfn(*args, tByT=tByT)
                 # t5 = time.perf_counter_ns()
             else:
                 if BETTER_ERRORS:
@@ -510,7 +510,7 @@ class _Dispatcher:
                     # even better say we can't find a match for two arguments
                     try:
                         # dispatchTime += time.perf_counter_ns() - t4; dispatchCount += 1
-                        answer = fn.pyfn(*args)
+                        ret = fn.pyfn(*args)
                         # t5 = time.perf_counter_ns()
                     except TypeError as ex:
                         if ex.args and ' required positional argument' in ex.args[0]:
@@ -522,23 +522,34 @@ class _Dispatcher:
                         # return f'({",".join(argTs)})->{retT} <{x.style.name}>  :   in {x.fullname}'
                 else:
                     # dispatchTime += time.perf_counter_ns() - t4; dispatchCount += 1
-                    answer = fn.pyfn(*args)
+                    ret = fn.pyfn(*args)
                     # t5 = time.perf_counter_ns()
             tRet = fn.tRet
-            if tRet == py or isinstance(answer, SelectionResult):
+            if tRet == py or isinstance(ret, SelectionResult):
                 # returnTime += time.perf_counter_ns() - t5; returnCount += 1
-                return answer
+                return ret
             else:
                 # MUSTDO
                 # BTTuples are products whereas pytuples are exponentials therefore we can reliably type check an answered
                 # sequence if the return type is BTTuple (and possibly BTStruct) - also BTTuple can be coerced by default to
                 # a dseq (or similar - may should add a new tuple subclass to prevent it being treated like an exponential)
                 # add a note in bones that one of our basic ideas / building blocks is things and exponentials of things
-                if origFitsWithin(_typeOf(answer), tRet):
-                    # returnTime += time.perf_counter_ns() - t5; returnCount += 1
-                    return answer
+                if hasattr(ret, '_t'):
+                    if ret._t:
+                        # check the actual return type fits the declared return type
+                        if origFitsWithin(ret._t, tRet):
+                            return ret
+                        else:
+                            raiseLess(BTypeError(f'{fn.fullname} returned a {str(_typeOf(ret))} should have have returned a {tRet} {tByT}',ErrSite("#1")))
+                    else:
+                        return ret | tRet
                 else:
-                    raiseLess(TypeError(f'{fn.fullname} returned a {str(_typeOf(answer))} should have have returned a {fn.tRet} {tByT}',ErrSite("#1")))
+                    # use the coercer rather than impose construction with tv
+                    if origFitsWithin(typeOf(ret), tRet):
+                        return ret
+                    else:
+                        return ret | tRet
+
         else:
             # dispatchTime += time.perf_counter_ns() - t4; dispatchCount += 1
             return SelectionResult(fn, tByT)
@@ -584,6 +595,7 @@ def _typeOf(x):
             t = builtins.type(x._target)         # return the type of thing being proxied
         return _btypeByClass.get(t, t)       # type python types as their bones equivalent
 
+sys._typeOf = _typeOf               # required by coercion - do not remove
 
 def _sig(x):
     if isinstance(x, function):

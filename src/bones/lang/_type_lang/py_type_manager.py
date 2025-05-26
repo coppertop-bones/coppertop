@@ -10,7 +10,7 @@
 
 import collections, itertools
 
-from bones.lang.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, bmtsvr
+from bones.typing.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, bmtsvr
 
 from bones.jones import BTypeError
 from bones.core.sentinels import Missing

@@ -24,24 +24,25 @@ import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 
-__all__ = ['BType', 'S']
+__all__ = ['BType', 'BTypeError', 'SchemaError', 'extractTypeFromConstructionArgs']
 
 import itertools, builtins, collections, statistics
 
 from bones.lang._type_lang.jones_type_manager import JonesTypeManager, BType, BTAtom, BTIntersection, BTUnion, \
-    BTTuple, BTStruct, BTSeq, BTMap, BTFn, BTSchemaVariable, BTOverload, BTypeError, ppT, _btcls_by_bmtid
+    BTTuple, BTStruct, BTSeq, BTMap, BTFn, BTSchemaVariable, BTOverload, BTypeError, ppT, _btcls_by_bmtid, \
+    extractTypeFromConstructionArgs
+from bones.typing.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, \
+    bmtsvr, bmtnameById, SchemaError
 from bones.lang._type_lang.jones_type_manager import _btypeByClass, _BTypeById     # used by coppertop.pipe - do not remove
 from bones.lang.type_lang import TypeLangInterpreter
 
-from bones.lang.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, bmtsvr, bmtnameById
-
-from bones.core.errors import ProgrammerError, NotYetImplemented, PathNotTested, WTF
+from bones.core.errors import ProgrammerError, NotYetImplemented, PathNotTested
 from bones.core.sentinels import Missing, Void, generator
 
 
 _verboseNames = False
 
-_idSeed = itertools.count(start=1)   # reserve id 0 as a terminator of a type set
+_idSeed = itertools.count(start=1)              # reserve id 0 as a terminator of a type set
 
 REPL_OVERRIDE_MODE = False
 
@@ -50,10 +51,9 @@ _BTypeByName = {}
 
 
 
-
 def raiseCantNameBTypeError(this, name, other):
     raise BTypeError(
-        f"Can't name new type ({type(this)}) as '{name}' as another BType({type(other)}) already has that name"
+        f'Can\'t name new type ({type(this)}) as "{name}" as another BType({type(other)}) already has that name'
     )
 
 
@@ -68,7 +68,6 @@ class BTReserved(BType):
         return cls._new(bt)
 
 
-
 class _Flags:
     __slots__ = ['hasActualT', 'hasT', 'explicit', 'orthogonal']
     def __init__(self):
@@ -79,7 +78,7 @@ class _Flags:
 
 def _sortedIntersectionTypes(types, singleSV):
     flags = _Flags()
-    if len(types) < 2: raise ProgrammerError("Needs 2 or more types")
+    if len(types) < 2: raise ProgrammerError('Needs 2 or more types')
     collated = []
     for t in types:
         if isinstance(t, BTIntersection):            # BTIntersection is a subclass of BType so this must come first
@@ -106,7 +105,7 @@ def _sortedIntersectionTypes(types, singleSV):
                     collated.append(e)
                     _updateFlagsForIntersection(t, flags, singleSV)
                 else:
-                    raise BTypeError("OPEN: Needs description")
+                    raise BTypeError('OPEN: Needs description')
     collated.sort(key=lambda t: t.id if isinstance(t, BType) else hash(t))
     compacted = [collated[0]]  # add the first
     for i in range(1, len(collated)):  # from the second to the last, if each is different to the prior add it
@@ -140,6 +139,7 @@ class _AddStuff:
     def __ror__(self, instance):    # instance | type
         return instance | BTIntersection(instance._t if hasattr(instance, '_t') else builtins.type(instance), self.t)
 
+
 class _SubtractStuff:
     def __init__(self, t):
         self.t = t
@@ -151,18 +151,12 @@ class _SubtractStuff:
             self.t.types if isinstance(self.t, BTIntersection) else (self.t, )
         )
         if b_:
-            raise BTypeError(f"RHS is trying to subtract {b_} which isn't in the LHS")
+            raise BTypeError(f'RHS is trying to subtract {b_} which isn\'t in the LHS')
         if not ab:
-            raise ProgrammerError(f"Can't end up subtracting nothing")
+            raise ProgrammerError(f'Can\'t end up subtracting nothing')
         if not a_:
-            raise BTypeError("Left with null set")
+            raise BTypeError('Left with null set')
         return instance | (a_[0] if len(a_) == 1 else BTIntersection(*a_))
-
-
-
-S = BTStruct
-
-
 
 
 def _anyHasT(*types):
@@ -226,8 +220,6 @@ def _BTypeToPyBType(bt):
     return sys._gtm.replaceWith(bt, cls._new(bt))
 
 
-class SchemaError(BTypeError): pass
-
 def fitsWithin(a, b, *, fittingSigs=False):
     # type clean up
     if not isinstance(a, BType) and not isinstance(a, type): a = _BTypeToPyBType(a)
@@ -257,22 +249,24 @@ def fitsWithin(a, b, *, fittingSigs=False):
             cacheId = (a.id, b.id)
         else:
             raise TypeError('fitsWithin only supports Python types and BTypes')
+        if a.hasT:
+            if isinstance(a, BTFn) and isinstance(b, BTFn):
+                fittingSigs = True
+            if not fittingSigs:
+                raise BTypeError(f'LHS type ({a}) is polymorphic and thus cannot match RHS type {b}')
     else:
         raise TypeError('fitsWithin only supports Python types and BTypes')
 
     fits = _fitsCache.get(cacheId, Missing)
     if fits is not Missing: return fits
-    if a.hasT:
-        if isinstance(a, BTFn) and isinstance(b, BTFn):
-            fittingSigs = True
-        if not fittingSigs:
-            raise BTypeError(f'LHS type ({a}) is polymorphic and thus cannot match RHS type {b}')
+
     try:
         _fitsCache[cacheId] = answer = _fitsWithin(a, b, fittingSigs=fittingSigs)
         return answer
     except SchemaError as ex:
         return DOES_NOT_FIT
 
+sys._fitsWithin = fitsWithin        # for coercion - do not remove
 
 def _fitsWithin(a, b, fittingSigs=False):
     # answers a Fits named tuple
@@ -684,7 +678,7 @@ def _processA_(a_, schemaVars, lenWeakenings):
         try:
             tlid = sys._gtm.intersectionTlidFor(a_)
         except:
-            print("ponder some more")
+            print('ponder some more')
             # raise BTypeError("OPEN: Needs description")
     return Fits(True, schemaVars, len(a_) + lenWeakenings)
 

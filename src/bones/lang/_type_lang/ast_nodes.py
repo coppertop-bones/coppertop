@@ -10,7 +10,7 @@
 
 from bones.core.sentinels import Missing
 from bones.core.errors import ProgrammerError
-from bones.lang.core import bmtnul
+from bones.typing.core import bmtnul
 
 
 class SrcLoc:

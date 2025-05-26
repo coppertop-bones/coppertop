@@ -17,7 +17,8 @@ if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 from bones.core.context import context
 from bones.core.sentinels import Missing
 from bones.core.errors import ProgrammerError, ErrSite
-from bones.lang.metatypes import updateSchemaVarsWith, fitsWithin, BType, SchemaError, BTypeError
+from bones.lang.metatypes import updateSchemaVarsWith, fitsWithin, BType
+from bones.typing.core import SchemaError, BTypeError
 from bones.core.utils import raiseLess
 
 
