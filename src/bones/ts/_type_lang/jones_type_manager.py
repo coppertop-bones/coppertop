@@ -21,7 +21,7 @@ from bones.ts.core import Constructors
 from bones.ts._type_lang.utils import OnErrorRollback
 from bones.ts._type_lang.fits import fitsWithin
 from bones.core.errors import ProgrammerError, NotYetImplemented, PathNotTested
-from bones.core.utils import raiseLess
+from bones.core.utils import raiseLess, firstValue
 from bones.core.errors import ErrSite
 from bones.core.context import context
 from bones.ts.type_lang import TypeLangInterpreter
@@ -144,9 +144,22 @@ class BType(BTypeRoot):
             if (coercer := self._coercer) is Missing:
                 if isinstance(self, BTIntersection):
                     # if we are an intersection type then check if one is in the intersection's types
-                    for t in self.types:
-                        if (coercer := t._coercer) is not Missing:
-                            break
+                    coercers = {t:t._coercer for t in self.types if t._coercer is not Missing}
+                    if len(coercers) == 0:
+                        pass
+                    elif len(coercers) == 1:
+                        coercer = firstValue(coercers)
+                    else:
+                        for t in list(coercers.keys()):
+                            if isinstance(t, BTIntersection):
+                                for tChild in t.types:
+                                    if tChild != t:
+                                        coercers.pop(tChild, None)
+                        if len(coercers) == 1:
+                            coercer = firstValue(coercers)
+                        else:
+                            msg = f'`{repr(instance)}` can\'t be coerced to <:{self}> - instance has no _asT, type (or intersection\'s types) has more than one _coercer'
+                            raiseLess(BTypeError(msg, ErrSite(self.__class__)))
             if coercer:
                 return coercer(self, instance)
             else:
