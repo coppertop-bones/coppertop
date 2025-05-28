@@ -64,7 +64,7 @@ import inspect, types, builtins
 from collections import namedtuple
 
 import coppertop
-coppertop.__version__ = "2024.03.08.1"
+coppertop.__version__ = "2025.05.01.1"
 from bones import jones
 
 from bones.core.context import context
@@ -80,6 +80,9 @@ from bones.jones import BTypeError
 
 
 py = BType('py: atom in mem')
+DISABLE_RETURN_CHECK = False
+DISABLE_ARG_CHECK_FOR_SOLE_FN = False
+FN_ONLY_NAMES = []
 
 class CoppertopError(CPTBError): pass
 class CoppertopImportError(ImportError): pass
@@ -156,6 +159,9 @@ def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEv
         if (uberFn := umod.__dict__.get(fnname, Missing)): _checkStyleAndNumArgs(style_, uberFn, fnname, argNames)
 
         # figure exact what to update
+        if fnname in FN_ONLY_NAMES and modname == 'scratch':
+            bf = jonesFnByStyle[style_](fnname, modname, pyfn, _UNDERSCORE)
+            return bf
         if enclosingFnName:
             if pymodFn is Missing:
                 return jonesFnByStyle[style_](fnname, modname + '.' + enclosingFnName, _Dispatcher(fn), _UNDERSCORE)
@@ -450,6 +456,10 @@ class _Dispatcher:
             # ensure we have a cache
             if numArgs > len(self.cacheByNumArgs) - 1:
                 raise TypeError(f"Too many args passed to  {self.name} - max {len(self.cacheByNumArgs) - 1}, passed {numArgs}")
+
+            if DISABLE_ARG_CHECK_FOR_SOLE_FN and len(fns := self.fnBySigByNumArgs[numArgs]) == 1:
+                return firstValue(fns), {}, True
+
             if (cache := self.cacheByNumArgs[numArgs]) is Missing:
                 pSC = jones.sc_new(numArgs, 100)
                 cache = self.cacheByNumArgs[numArgs] = (pSC, [])
@@ -482,6 +492,14 @@ class _Dispatcher:
         # global hits, misses, hitTime1, hitTime2, missTime1, missTime2, searchTime, dispatchTime, dispatchCount, returnTime, returnCount
         # t1 = time.perf_counter_ns()
 
+        if DISABLE_ARG_CHECK_FOR_SOLE_FN:
+            numArgs = len(args)
+            if numArgs <= len(self.fnBySigByNumArgs):
+                if len(fns := self.fnBySigByNumArgs[numArgs]) == 1:
+                    fn = firstValue(fns)
+                    if not fn.pass_tByT:
+                        return fn.pyfn(*args)
+
         fn, tByT, hasValue = self.selectFn(args)
 
         # t4 = time.perf_counter_ns()
@@ -492,6 +510,8 @@ class _Dispatcher:
                     tByT = fn.typeHelper(*args, tByT=tByT)
                 # dispatchTime += time.perf_counter_ns() - t4; dispatchCount += 1
                 ret = fn.pyfn(*args, tByT=tByT)
+                if DISABLE_RETURN_CHECK:
+                    return ret
                 # t5 = time.perf_counter_ns()
             else:
                 if BETTER_ERRORS:
@@ -504,6 +524,8 @@ class _Dispatcher:
                     try:
                         # dispatchTime += time.perf_counter_ns() - t4; dispatchCount += 1
                         ret = fn.pyfn(*args)
+                        if DISABLE_RETURN_CHECK:
+                            return ret
                         # t5 = time.perf_counter_ns()
                     except TypeError as ex:
                         if ex.args and ' required positional argument' in ex.args[0]:
@@ -516,8 +538,11 @@ class _Dispatcher:
                 else:
                     # dispatchTime += time.perf_counter_ns() - t4; dispatchCount += 1
                     ret = fn.pyfn(*args)
+                    if DISABLE_RETURN_CHECK:
+                        return ret
                     # t5 = time.perf_counter_ns()
             tRet = fn.tRet
+
             if tRet == py or isinstance(ret, SelectionResult):
                 # returnTime += time.perf_counter_ns() - t5; returnCount += 1
                 return ret
@@ -568,6 +593,11 @@ class _Dispatcher:
     def __repr__(self):
         return self.name
 
+def firstValue(d):
+    # https://stackoverflow.com/questions/30362391/how-do-you-find-the-first-key-in-a-dictionary
+    for v in d.values():
+        return v
+    raise ProgrammerError(f'd is empty')
 
 
 # **********************************************************************************************************************
