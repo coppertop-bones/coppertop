@@ -17,8 +17,9 @@
 # since Python is a dynamic language. We keep the uber overload in its own module virtually named `_`. E.g.
 # `from _ import PP` will import the uber overload of PP. A function implementation may opt out of being added to the
 # uber overload for example to allow `verbose.PP` and `terse.PP` to be used to distinguish differences where the
-# arguments have the same type or it make code more readable. E.g. dm.linalg.numpyimp and dm.linalg.playimp might be
-# used to switch a whole implementation or dm.csv.read and dm.xls.read might read better in context.
+# arguments have the same type or it make code more readable. E.g. coppertop.dm.linalg.numpyimp and
+# coppertop.dm.linalg.playimp might be used to switch a whole implementation or coppertop.dm.csv.read and
+# coppertop.dm.xls.read might read better in context.
 #
 #
 # in modules:
@@ -63,8 +64,8 @@ __all__ = [
 import inspect, types, builtins
 from collections import namedtuple
 
-import coppertop
-coppertop.__version__ = "2025.05.01.1"
+import coppertop as coppertopMod
+coppertopMod.__version__ = "2025.05.01.1"
 from bones import jones
 
 from bones.core.context import context
@@ -224,6 +225,15 @@ def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEv
         # of form as @coppertop() or @coppertop(overrideLHS=True) etc
         if len(args): raiseLess(TypeError('Only kwargs allowed', ErrSite("#2")))
         return registerFn
+
+# In general don't do this! However I want to be able to put libraries under the coppertop namespace and not have
+# `import coppertop.dm` which defines the local 'coppertop' as the module etc kybosh `from coppertop.pipe import *`
+# which defines the local 'coppertop' as the coppertop decorator.
+# See https://stackoverflow.com/questions/1060796/callable-modules for a discussion of this trick.
+class SpecialCoppertopModule(sys.modules[__name__].__class__):
+    def __call__(self, *args, **kwargs):
+        return coppertop(*args, **kwargs)
+coppertopMod.__class__ = SpecialCoppertopModule
 
 
 def _styleOfFn(fn):
