@@ -567,17 +567,18 @@ class BTStruct(BType):
     # product type accessed by name
 
     def __new__(cls, *args, btype=Missing, **kwargs):
+        # OPEN: for moment convert suymbols to strings
         if args:
             if len(args) == 1 and isinstance(args[0], dict):
-                names = tuple(args[0].keys())
+                names = tuple((str(a) for a in args[0].keys()))
                 types = tuple(args[0].values())
             elif len(args) == 2 and isinstance(args[0], (tuple, list)) and isinstance(args[1], (tuple, list)):
-                names = tuple(args[0])
+                names = tuple((str(a) for a in args[0]))
                 types = tuple(args[1])
             else:
                 raise BTypeError('Unhandled case')
         else:
-            names = tuple(kwargs.keys())
+            names = tuple((str(a) for a in kwargs.keys()))
             types = tuple(kwargs.values())
         if len(names) != len(types):
             raise BTypeError('names and types must be of same length')
