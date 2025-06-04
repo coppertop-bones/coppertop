@@ -25,6 +25,7 @@ from bones.core.sentinels import Null, Void
 from bones.ts.metatypes import BTAtom, BType
 
 mem = BType('mem')
+
 noun = BTAtom("noun")
 nullary = BTAtom("nullary")
 unary = BTAtom("unary")
@@ -40,9 +41,14 @@ Void._t = void
 
 # bones allows for literal frames, tuples and structs and since we would like to have multiple implementations, for
 # example pandas and polars etc, we need root types to derive from.
-tup = BTAtom('tup')
-struct = BTAtom('struct')
-frame = BTAtom('frame')
+agg = BTAtom('agg')                             # conceptually this is nice however not sure how much value it adds given it implies multiple spaces
+
+tup = BType('tup: tup & agg in agg')            # slots are accessed by index only
+struct = BType('struct: struct & agg in agg')   # slots are accessed by name (symbol) or index
+rec = BType('rec: rec & agg in agg')            # slots are accessed by name (symbol) only, no index access
+frame = BType('frame: frame & agg in agg')      # cols are accessed by name (symbol), rows are accessed by index
+
+cstruct = BType('cstruct: cstruct & struct in mem')     # will be laid out in memory using C struct rules
 
 litint = BTAtom('litint', space=mem)
 litdec = BTAtom('litdec', space=mem)
@@ -50,6 +56,7 @@ littxt = BTAtom('littxt', space=mem)
 litsym = BTAtom('litsym', space=mem)
 litsyms = BTAtom('litsyms', space=mem)
 litdate = BTAtom('litdate', space=mem)
+
 littup = BType('littup: littup & tup in mem')
 litstruct = BType('litstruct: litstruct & struct in mem')
 litframe = BType('litframe: litframe & frame in mem')
