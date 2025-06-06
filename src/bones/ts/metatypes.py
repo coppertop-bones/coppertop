@@ -648,7 +648,7 @@ def _processA_(a_, schemaVars, lenWeakenings):
         try:
             tlid = sys._gtm.intersectionTlidFor(a_)
         except:
-            print('ponder some more')
+            print('ponder some more', file=sys.stderr)
             # raise BTypeError("OPEN: Needs description")
     return Fits(True, schemaVars, len(a_) + lenWeakenings)
 

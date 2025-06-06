@@ -76,7 +76,7 @@ from bones.core.utils import raiseLess
 from bones.ts.metatypes import BType, fitsWithin as origFitsWithin, BTFn, BTTuple, BTAtom, \
     BTOverload, _BTypeById, _btypeByClass
 from bones.lang.types import nullary, unary, binary, ternary
-from coppertop._select import _ppType, _selectFunction
+from bones.ts.select import _ppType, selectFunction
 from bones.jones import BTypeError
 
 
@@ -142,6 +142,8 @@ def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEv
     def registerFn(pyfn):
         # answer a jones fn (i.e. that can be partialed, piped or called) that may contain an overload
         style_ = unary if style is Missing else style
+        if name == '*':
+            a = 1
         updateUber = not local
         modname, bmod, umod, fnname, pymodFn, enclosingFnName, argNames, sig, tRet, pass_tByT = _fnContext(pyfn, 'registerFn', name)
 
@@ -286,10 +288,10 @@ def _fnContext(pyfn, callerFnName, name):
         frame = frame.f_back
     # if name is given do some checks
     fnname = pyfn.__name__
+    priorX = frame.f_locals.get(fnname, Missing)
     if name:
         if name == fnname: raise CoppertopError('In order to reduce accidental errors it is not allowed to name a function as itself')
         fnname = name
-    priorX = frame.f_locals.get(fnname, Missing)
     if priorX is Missing: priorX = frame.f_globals.get(fnname, Missing)
     modname = frame.f_globals.get('__name__', Missing)
     if modname is Missing: raise CoppertopError('frame has no __name__')
@@ -485,7 +487,7 @@ class _Dispatcher:
             if resultId == 0:
                 # missTime1 += t2 - t1; missTime2 += t3 - t2; misses += 1
                 tArgs = jones.sc_tArgsFromQuery(pSC, _BTypeById)
-                fn, tByT = _selectFunction(tArgs, self.fnBySigByNumArgs[numArgs], self.name, self.fnBySigByNumArgs)
+                fn, tByT, distance, argDistances = selectFunction(tArgs, self.fnBySigByNumArgs[numArgs], py, self.name, self.fnBySigByNumArgs)
                 results.append((fn, tByT))
                 pQuery = jones.sc_queryPtr(pSC)
                 iNext = jones.sc_nextFreeArrayIndex(pSC)
@@ -622,6 +624,8 @@ def _typeOf(x):
         return x.d._t
     elif isinstance(x, jones._pfn):
         return x.d._tPartial(x.num_args, x.o_tbc)
+    elif isinstance(x, BType):
+        return x
     else:
         t = builtins.type(x)
         if t is _CoWProxy:
