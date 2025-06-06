@@ -18,11 +18,12 @@ __all__ = [
     'mem',
     'TBI', 'void', 'null',
     'tup', 'struct', 'frame',
-    'litint', 'litdec', 'littxt', 'litsym', 'litsyms', 'litdate', 'litframe', 'littup', 'litstruct',
+    'litint', 'litnum', 'littxt', 'litsym', 'litsyms', 'litdate', 'litframe', 'littup', 'litstruct',
+    'T', 'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9',
 ]
 
-from bones.core.sentinels import Null, Void
-from bones.ts.metatypes import BTAtom, BType
+from bones.core.sentinels import Null, Void, Missing
+from bones.ts.metatypes import BTAtom, BType, extractTypeFromConstructionArgs
 
 mem = BType('mem')
 
@@ -50,10 +51,114 @@ frame = BType('frame: frame & agg in agg')      # cols are accessed by name (sym
 
 cstruct = BType('cstruct: cstruct & struct in mem')     # will be laid out in memory using C struct rules
 
-litint = BTAtom('litint', space=mem)
-litdec = BTAtom('litdec', space=mem)
-littxt = BTAtom('littxt', space=mem)
-litsym = BTAtom('litsym', space=mem)
+
+class _litint(int):
+    def __new__(cls, *args, **kwargs):
+        t, args = extractTypeFromConstructionArgs(args)
+        if len(args) == 1:
+            assert t == litint
+            return super(cls, cls).__new__(cls, args[0])
+        elif len(args) == 2:
+            t, v = args
+            assert t == litint
+            return super(cls, cls).__new__(cls, v)
+        else:
+            raise SyntaxError(f'Expected 1 argument, got {len(args)}')
+    @property
+    def _t(self):
+        return litint
+    def _v(self):
+        return self
+    def __repr__(self):
+        return f'litint({super().__repr__()})'
+def _asLitint(t, v):
+    return _litint(t, v)
+litint = BTAtom('litint', space=mem).setConstructor(_litint).setCoercer(_asLitint)
+
+
+class _litnum(float):
+    def __new__(cls, *args, **kwargs):
+        t, args = extractTypeFromConstructionArgs(args)
+        if len(args) == 1:
+            assert t == litnum
+            return super(cls, cls).__new__(cls, args[0])
+        else:
+            raise SyntaxError(f'Expected 1 argument, got {len(args)}')
+    @property
+    def _t(self):
+        return litnum
+    def _v(self):
+        return self
+    def __repr__(self):
+        return f'litnum({super().__repr__()})'
+litnum = BType('litnum: atom in mem').setConstructor(_litnum)
+
+
+class littxt_(str):
+    def __new__(cls, *args, **kwargs):
+        if len(args) == 1:
+            return super(cls, cls).__new__(cls, args[0])
+        elif len(args) == 2:
+            t, v = args
+            assert t == littxt
+            return super(cls, cls).__new__(cls, v)
+        else:
+            raise SyntaxError(f'No args passed')
+    @property
+    def _t(self):
+        return littxt
+    @property
+    def _v(self):
+        return self
+    def __repr__(self):
+        return f'littxt({super().__repr__()})'
+littxt = BType('littxt: atom in mem').setConstructor(littxt_)
+
+
+class tmptv:
+    __slots__ = ['_t_', '_v_', '_hash']
+    def __init__(self, _t, _v):
+        assert isinstance(_t, (BType, type))
+        self._t_ = _t
+        self._v_ = _v
+        self._hash = Missing
+    def __setattr__(self, key, value):
+        if key in ('_t_', '_v_', '_hash'):
+            super().__setattr__(key, value)
+        else:
+            raise AttributeError()
+    @property
+    def _t(self):
+        return self._t_
+    @property
+    def _v(self):
+        return self._v_
+    def __repr__(self):
+        return f'tv({self._t_},{self._v_})'
+    def __str__(self):
+        return f'<{self._t_}:{self._v_}>'
+    def __eq__(self, other):
+        if not isinstance(other, tv):
+            return False
+        else:
+            return (self._t_ == other._t_) and (self._v_ == other._v_)
+    def __hash__(self):
+        # tv will be hashable if it's type and value are hashable
+        if self._hash is Missing:
+            self._hash = hash((self._t, self._v))
+        return self._hash
+
+def _litsymCons(cls, *args, **kwargs):
+    if len(args) == 1:
+        return tmptv(litsym, args[0])
+    elif len(args) == 2:
+        t, v = args
+        assert t == litsym
+        return tmptv(litsym, v)
+    else:
+        raise SyntaxError(f'No args passed')
+
+litsym = BTAtom('litsym', space=mem).setConstructor(_litsymCons)
 litsyms = BTAtom('litsyms', space=mem)
 litdate = BTAtom('litdate', space=mem)
 
@@ -61,9 +166,8 @@ littup = BType('littup: littup & tup in mem')
 litstruct = BType('litstruct: litstruct & struct in mem')
 litframe = BType('litframe: litframe & frame in mem')
 
+
 T = BType('T')
 for i in range(1, 10):
     t = BType(f'T{i}')
     locals()[t.name] = t
-
-__all__ += ['T','T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9']

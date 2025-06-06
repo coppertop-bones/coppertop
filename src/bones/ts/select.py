@@ -13,18 +13,15 @@ if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 from bones.core.context import context
 from bones.core.sentinels import Missing
 from bones.core.errors import ProgrammerError, ErrSite
-from bones.ts.metatypes import updateSchemaVarsWith, fitsWithin, BType
+from bones.ts.metatypes import updateSchemaVarsWith, fitsWithin
 from bones.ts.core import SchemaError, BTypeError
 from bones.core.utils import raiseLess
 
 
 
-py = BType('py: atom in mem')
-
-def _selectFunction(callerSig, fnBySig, nameForError, fnBySigByNumArgsForError):
-    matches = []
-    fallbacks = []
-    # search though each bound function ignoring discrepancies where the declared type is py
+def selectFunction(callerSig, fnBySig, catchAllType, fnNameForErr, familyFnForErr):
+    fallbacks, matches = [], []
+    # search though each function in fnBySig recording catchAll matches separately from actual matches
     distance = 10000
     for fnSig, fn in fnBySig.items():
         distance = 10000
@@ -32,12 +29,12 @@ def _selectFunction(callerSig, fnBySig, nameForError, fnBySigByNumArgsForError):
         match = True
         argDistances = []
         schemaVars = {}
-        for tArg, tParam in zip(callerSig, fnSig):
-            if tParam is py:
+        for tArg, tFnArg in zip(callerSig, fnSig):
+            if tFnArg == catchAllType:
                 fallback = True
                 argDistances.append(0.5)
             else:
-                fits = fitsWithin(tArg, tParam)
+                fits = fitsWithin(tArg, tFnArg)
                 if not fits:
                     match = False
                     break
@@ -48,73 +45,57 @@ def _selectFunction(callerSig, fnBySig, nameForError, fnBySigByNumArgsForError):
                     break
                 argDistances.append(argDistance)
         if match:
-            distance = sum(argDistances)
+            distance = sum(argDistances)        # effective L1, could do L2 or something else but needs to be easy to understand and intuit
             if fallback:
                 fallbacks.append((fn, schemaVars, distance, argDistances))
             else:
                 matches.append((fn, schemaVars, distance, argDistances))
         if distance == 0:
-            break
-    if distance == 0:
-        fn, tByT, distance, argDistances = matches[-1]
-    elif len(matches) == 0 and len(fallbacks) == 0:
-        raiseLess(_cantFindMatchError(callerSig, nameForError, fnBySigByNumArgsForError), ErrSite("#1"))
-    elif len(matches) == 1:
-        fn, tByT, distance, argDistances = matches[0]
-    elif len(matches) == 0 and len(fallbacks) == 1:
-        fn, tByT, distance, argDistances = fallbacks[0]
-    elif len(matches) > 0:
+            # OPEN: instead of escaping at first match complete the search and warn of potential conflicts (i.e. fns that have the same distance to the signature)
+            return fn, schemaVars, distance, argDistances
+
+    if len(matches) == 1:
+        return matches[0]
+    elif len(matches) > 1:
         matches.sort(key=lambda x: x[2])
-        # MUSTDO warn of potential conflicts that have not been explicitly noted
+        # OPEN: warn of potential conflicts (i.e. fns that have the same distance to the signature)
         if matches[0][2] != matches[1][2]:
-            fn, tByT, distance, argDistances = matches[0]
+            return matches[0]
         else:
-            # DOES_NOT_UNDERSTAND
-            # too many at same distance so report the situation nicely
-            caller = f'{nameForError}({",".join([repr(e) for e in callerSig])})'
+            # DOES_NOT_UNDERSTAND - too many matches at the same distance so report the situation nicely
+            caller = f'{fnNameForErr}({",".join([repr(e) for e in callerSig])})'
             print(f'1. {caller} fitsWithin:', file=sys.stderr)
             for fn, tByT, distance, argDistances in matches:
                 callee = f'{fn.name}({",".join([repr(argT) for argT in fn.sig])}) (argDistances: {argDistances}) defined in {fn.modname}'
                 print(f'  {callee}', file=sys.stderr)
             raiseLess(TypeError(f'Found {len(matches)} matches and {len(fallbacks)} fallbacks for {caller}', ErrSite("#2")))
+    elif len(fallbacks) == 1:
+        return fallbacks[0]
     elif len(fallbacks) > 0:
         fallbacks.sort(key=lambda x: x[2])
-        # MUSTDO warn of potential conflicts that have not been explicitly noted
+        # OPEN: warn of potential conflicts that have not been explicitly noted (i.e. that have the same distance to the signature)
         if fallbacks[0][2] != fallbacks[1][2]:
-            fn, tByT, distance, argDistances = fallbacks[0]
+            return fallbacks[0]
         else:
-            # DOES_NOT_UNDERSTAND
-            # too many at same distance so report the situation nicely
-            caller = f'2. {actual, expectednameForError}({",".join([repr(e) for e in callerSig])})'
+            # DOES_NOT_UNDERSTAND - too many fallbacks at the same distance so report the situation nicely
+            caller = f'2. {fnNameForErr}({",".join([repr(e) for e in callerSig])})'
             print(f'{caller} fitsWithin:', file=sys.stderr)
             for fn, tByT, distance, argDistances in matches:
                 callee = f'{fn.name}({",".join([repr(argT) for argT in fn.sig])}) (argDistances: {argDistances}) defined in {fn.modname}'
                 print(f'  {callee}', file=sys.stderr)
             raiseLess(TypeError(f'Found {len(matches)} matches and {len(fallbacks)} fallbacks for {caller}', ErrSite("#3")))
-        # if not match:
-        #     # DOES_NOT_UNDERSTAND`
-        #     with context(showFullType=True):
-        #         lines = [
-        #             f"Can't find {_ppFn(sd.name, callerSig)} ({len(callerSig)} args) in:",
-        #             f'  {_ppFn(sd.name, sd.sig, sd._argNames)} ({len(sd.sig)} args) in {sd.modname} - {sd.modname}'
-        #         ]
-        #         print('\n'.join(lines), file=sys.stderr)
-        #         raiseLess(TypeError('\n'.join(lines), ErrSite("#1")))
     else:
-        raise ProgrammerError('Can\'t get here', ErrSite("#4"))
-    return fn, tByT
+        raiseLess(_cantFindMatchError(callerSig, fnNameForErr, fnBySig, familyFnForErr), ErrSite("#1"))
 
 
-
-def _cantFindMatchError(sig, nameForError, fnBySigByNumArgsForError):
+def _cantFindMatchError(sig, fnNameForErr, fnBySig, familyFnForErr):
     with context(showFullType=True):
-        # DOES_NOT_UNDERSTAND
-        context.EE(f"Can't find {_ppFn(nameForError, sig)} in:")
-        for fnBySig in fnBySigByNumArgsForError:
-            for fnSig, fn in fnBySig.items():
-                context.EE(f'  {_ppFn(fn.name, fnSig)} in {fn.modname} - {fn.fullname}')
+        context.EE(f"Can't find {_ppFn(fnNameForErr, sig)} in:")
+        # for nArgs, fnBySig in familyFnForErr().items():
+        for fnSig, fn in fnBySig.items():
+            context.EE(f'  {_ppFn(fn.name, fnSig)} in {fn.modname} - {fn.fullname}')
 
-    return BTypeError(f"Can't find {_ppFn(nameForError, sig)}")
+    return BTypeError(f"Can't find {_ppFn(fnNameForErr, sig)}")
 
 
 def _ppFn(name, sig, argNames=Missing):
@@ -125,10 +106,7 @@ def _ppFn(name, sig, argNames=Missing):
 
 
 def _ppType(t):
-    if t is py:
-        return "py"
-    elif type(t) is type:
+    if type(t) is type:
         return t.__name__
     else:
         return repr(t)
-
