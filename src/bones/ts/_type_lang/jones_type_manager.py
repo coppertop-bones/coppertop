@@ -752,12 +752,12 @@ def ppT(t):
     return (t.__name__, False, False) if isinstance(t, type) else t.ppT()
 
 
-def extractTypeFromConstructionArgs(args):
-    if args and isinstance(args[0], Constructors):
-        t, args = args[0][0], args[1:]
+def extractConstructors(args_, kwargs_):
+    if args_ and isinstance(args_[0], Constructors):
+        constr, args = args_[0][0], args_[1:]
     else:
-        t = Missing
-    return t, args
+        constr, args = Missing, args_
+    return constr, args, kwargs_
 
 
 

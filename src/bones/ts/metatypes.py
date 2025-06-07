@@ -20,14 +20,14 @@ import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 
-__all__ = ['BType', 'BTypeError', 'SchemaError', 'extractTypeFromConstructionArgs']
+__all__ = ['BType', 'BTypeError', 'SchemaError', 'extractConstructors']
 
 import itertools, builtins, collections, statistics
 
 import bones.ts._type_lang.jones_type_manager
 from bones.ts._type_lang.jones_type_manager import JonesTypeManager, BType, BTAtom, BTIntersection, BTUnion, \
     BTTuple, BTStruct, BTSeq, BTMap, BTFn, BTSchemaVariable, BTOverload, BTypeError, ppT, _btcls_by_bmtid, \
-    extractTypeFromConstructionArgs
+    extractConstructors
 from bones.ts.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, \
     bmtsvr, bmtnameById, SchemaError
 from bones.ts._type_lang.jones_type_manager import _btypeByClass, _BTypeById     # used by coppertop.pipe - do not remove
