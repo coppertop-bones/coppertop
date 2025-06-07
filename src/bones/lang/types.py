@@ -23,7 +23,7 @@ __all__ = [
 ]
 
 from bones.core.sentinels import Null, Void, Missing
-from bones.ts.metatypes import BTAtom, BType, extractTypeFromConstructionArgs
+from bones.ts.metatypes import BTAtom, BType, extractConstructors
 
 mem = BType('mem')
 
@@ -53,10 +53,10 @@ cstruct = BType('cstruct: cstruct & struct in mem')     # will be laid out in me
 
 
 class _litint(int):
-    def __new__(cls, *args, **kwargs):
-        t, args = extractTypeFromConstructionArgs(args)
+    def __new__(cls, *args_, **kwargs_):
+        constr, args, kwargs = extractConstructors(args_, kwargs_)
         if len(args) == 1:
-            assert t == litint
+            assert constr == litint
             return super(cls, cls).__new__(cls, args[0])
         elif len(args) == 2:
             t, v = args
@@ -77,10 +77,10 @@ litint = BTAtom('litint', space=mem).setConstructor(_litint).setCoercer(_asLitin
 
 
 class _litnum(float):
-    def __new__(cls, *args, **kwargs):
-        t, args = extractTypeFromConstructionArgs(args)
+    def __new__(cls, *args_, **kwargs_):
+        constr, args, kwargs = extractConstructors(args_, kwargs_)
         if len(args) == 1:
-            assert t == litnum
+            assert constr == litnum
             return super(cls, cls).__new__(cls, args[0])
         else:
             raise SyntaxError(f'Expected 1 argument, got {len(args)}')
@@ -95,7 +95,8 @@ litnum = BType('litnum: atom in mem').setConstructor(_litnum)
 
 
 class littxt_(str):
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args_, **kwargs_):
+        constr, args, kwargs = extractConstructors(args_, kwargs_)
         if len(args) == 1:
             return super(cls, cls).__new__(cls, args[0])
         elif len(args) == 2:
