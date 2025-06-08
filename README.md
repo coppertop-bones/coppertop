@@ -12,8 +12,7 @@ Coppertop provides an alternative programming experience in Python via the follo
 
 ### Installation
 
-OUT-OF-ORDER\
-`pip install coppertop-bones-dm` for the dm core library and the @coppertop decorator.\
+`pip install coppertop-bones-libs` for the dm core library and the @coppertop decorator.\
 `pip install coppertop` just for the @coppertop decorator.
 
 At the moment needs to be git cloned and the setup.py manually run.
@@ -186,7 +185,7 @@ from dm.core import to
 
 ### Other
 * [Hadley Wickham on pipes](https://r4ds.had.co.nz/pipes.html)
-* [Comparison of coppertop style with other piped languages](./docs/compare-with-other-piped-languages.md)
+* [Comparison of coppertop style with other piped languages](https://github.com/coppertop-bones/docs/blob/main/docs/compare-with-other-piped-languages.md)
 
 <br>
 
