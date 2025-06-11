@@ -5,7 +5,7 @@ Coppertop provides an alternative programming experience in Python via the follo
 * multiple-dispatch
 * partial functions
 * piping syntax
-* an embryonic [core library](https://github.com/coppertop-bones/dm/tree/main/src/dm) of common functions
+* an embryonic [core library](https://github.com/coppertop-bones/coppertop-libs/tree/main/src/dm) of common functions
 
 <br>
 
@@ -150,17 +150,17 @@ actual >> check >> equal >> [4, 6]
 #### Bag of M&Ms problem 
 
 In [Why coppertop - MM problem from Think Bayes.ipynb](
-https://github.com/coppertop-bones/dm/blob/main/jupyter/Why%20coppertop%20-%20MM%20problem%20from%20Think%20Bayes.ipynb
+https://github.com/coppertop-bones/coppertop-libs/blob/main/jupyter/Why%20coppertop%20-%20MM%20problem%20from%20Think%20Bayes.ipynb
 ) we implement a coppertop solution to the problem and silently introduce intersection types.
 
 #### Cluedo notepad
 
 See [algos.py](
-https://github.com/coppertop-bones/dm/blob/main/examples/dm/examples/cluedo/algos.py
+https://github.com/coppertop-bones/coppertop-libs/blob/main/examples/dm/examples/cluedo/algos.py
 ), where we track a game of Cluedo and infer who did it. See [ex_games.py](
-https://github.com/coppertop-bones/dm/blob/main/examples/dm/examples/cluedo/ex_games.py
+https://github.com/coppertop-bones/coppertop-libs/blob/main/examples/dm/examples/cluedo/ex_games.py
 ) and [cluedo-pad.ipynb](
-https://github.com/coppertop-bones/dm/blob/main/jupyter/cluedo-pad.ipynb
+https://github.com/coppertop-bones/coppertop-libs/blob/main/jupyter/cluedo-pad.ipynb
 ) for example game input and notepad output.
 
 <br>
