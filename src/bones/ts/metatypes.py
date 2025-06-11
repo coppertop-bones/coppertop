@@ -26,7 +26,7 @@ import itertools, builtins, collections, statistics
 
 import bones.ts._type_lang.jones_type_manager
 from bones.ts._type_lang.jones_type_manager import JonesTypeManager, BType, BTAtom, BTIntersection, BTUnion, \
-    BTTuple, BTStruct, BTSeq, BTMap, BTFn, BTSchemaVariable, BTOverload, BTypeError, ppT, _btcls_by_bmtid, \
+    BTTuple, BTStruct, BTSeq, BTMap, BTFn, BTSchemaVariable, BTFamily, BTypeError, ppT, _btcls_by_bmtid, \
     extractConstructors
 from bones.ts.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, \
     bmtsvr, bmtnameById, SchemaError
@@ -510,14 +510,14 @@ def _fitsWithin(a, b, fittingSigs=False):
             # print(f'{a} <: {b} is true')
             return Fits(True, schemaVars, distance)
 
-        elif isinstance(a, BTOverload):
+        elif isinstance(a, BTFamily):
             # we don't do soft typing in coppertop
             return DOES_NOT_FIT
 
         else:
             return DOES_NOT_FIT
 
-    elif isinstance(a, BTOverload):
+    elif isinstance(a, BTFamily):
         if isinstance(b, BTFn):
             # must be a fit for one of a with b
             schemaVars, distance = {}, 0
@@ -529,7 +529,7 @@ def _fitsWithin(a, b, fittingSigs=False):
             else:
                 return DOES_NOT_FIT
 
-        elif isinstance(b, BTOverload):
+        elif isinstance(b, BTFamily):
             # a must fit with every one of b
             schemaVars, distance = {}, 0
             for bT in b.types:

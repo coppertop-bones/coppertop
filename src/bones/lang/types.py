@@ -11,7 +11,7 @@ import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 
-# just the types needed by the bones itself
+# just the types needed by the bones language itself
 
 __all__ = [
     'noun', 'nullary', 'unary', 'binary', 'ternary',
@@ -20,12 +20,107 @@ __all__ = [
     'tup', 'struct', 'frame',
     'litint', 'litnum', 'littxt', 'litsym', 'litsyms', 'litdate', 'litframe', 'littup', 'litstruct',
     'T', 'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9',
+    '_tv', '_tvfunc'
 ]
 
 from bones.core.sentinels import Null, Void, Missing
-from bones.ts.metatypes import BTAtom, BType, extractConstructors
+from bones.ts.metatypes import BTAtom, BType, extractConstructors, BTFn, BTTuple
 
-mem = BType('mem')
+
+
+# **********************************************************************************************************************
+# general purpose tv structure boxing both type and value
+# **********************************************************************************************************************
+
+class _tv:
+    __slots__ = ['_t', '_v', '_hash']
+    def __new__(cls, *args_, **kwargs_):
+        constr, args, kwargs = extractConstructors(args_, kwargs_)
+        if constr:
+            assert isinstance(constr, (BType, type))
+            instance = super(cls, cls).__new__(cls)
+            instance._t = constr
+            instance._v = args[0]
+            instance._hash = Missing
+            return instance
+        else:
+            if len(args) == 2:
+                t, v = args
+                assert isinstance(t, (BType, type))
+                instance = super(cls, cls).__new__(cls)
+                instance._t = t
+                instance._v = args[1]
+                instance._hash = Missing
+                return instance
+            else:
+                raise SyntaxError(f'_tv(...) must be of form _tv(type, value) or _tv(BType, value)')
+    def _asT(self, _t):
+        return _tv(_t, self._v)
+    def __repr__(self):
+        return f'tv({self._t},{self._v})'
+    def __str__(self):
+        return f'<{self._t}:{self._v}>'
+    def __eq__(self, other):
+        if not hasattr(other, '_tv'):
+            return False
+        else:
+            return (self._t == other._t) and (self._v == other._v)
+    def __hash__(self):
+        # tv will be hashable if it's type and value are hashable
+        if self._hash is Missing:
+            self._hash = hash((self._t, self._v))
+        return self._hash
+
+
+
+# **********************************************************************************************************************
+# function structure
+# **********************************************************************************************************************
+
+class _tvfunc:
+
+    __slots__ = [
+        'style', 'name', '_t', 'modname', '_v', '_argNames', 'sig', 'tArgs', 'tRet',
+        'pass_tByT', 'dispatchEvenIfAllTypes', 'typeHelper', '__doc__'
+     ]
+
+    def __init__(self, *, name, modname, style, _v, dispatchEvenIfAllTypes, typeHelper, _t, argNames, pass_tByT):
+        if not isinstance(_t, BTFn): raise TypeError('_t is not a BTFn')
+        self.name = name
+        self.modname = modname
+        self.style = style
+        self._v = _v
+        self._argNames = argNames
+        self._t = _t
+        self.tArgs = _t.tArgs
+        self.tRet = _t.tRet
+        self.sig = _t.tArgs.types
+        self.pass_tByT = pass_tByT
+        self.dispatchEvenIfAllTypes = dispatchEvenIfAllTypes          # calls the function rather than returns the dispatch when all args are types
+        self.typeHelper = typeHelper
+        self.__doc__ = _v.__doc__ if hasattr(_v, '__doc__') else None
+
+    @property
+    def fullname(self):
+        return self.modname + '.' + self.name
+
+    @property
+    def numargs(self):
+        return len(self.sig)
+
+    def _tPartial(self, o_tbc):
+        return BTFn(BTTuple(*(self.sig[o] for o in o_tbc)), self.tRet)
+
+    def __repr__(self):
+        return self.name
+
+
+
+# **********************************************************************************************************************
+# bones langauge types and structures
+# **********************************************************************************************************************
+
+mem = BType('mem')                      # the memory space
 
 noun = BTAtom("noun")
 nullary = BTAtom("nullary")
@@ -36,14 +131,15 @@ ternary = BTAtom("ternary")
 TBI = BTAtom("TBI", space=mem)
 void = BTAtom('void', space=mem)        # something that isn't there and shouldn't be there
 null = BTAtom('null')                   # the null set - something that isn't there and that's okay
+missing = BTAtom('missing')             # something that isn't there but should be - considered an error
 
 Null._t = null
 Void._t = void
 
 # bones allows for literal frames, tuples and structs and since we would like to have multiple implementations, for
-# example pandas and polars etc, we need root types to derive from.
+# example pandas and polars etc, and additionally we can't currently express T1(bstr), T1(btup), etc so we need root
+# types to derive from:
 agg = BTAtom('agg')                             # conceptually this is nice however not sure how much value it adds given it implies multiple spaces
-
 tup = BType('tup: tup & agg in agg')            # slots are accessed by index only
 struct = BType('struct: struct & agg in agg')   # slots are accessed by name (symbol) or index
 rec = BType('rec: rec & agg in agg')            # slots are accessed by name (symbol) only, no index access
@@ -51,6 +147,8 @@ frame = BType('frame: frame & agg in agg')      # cols are accessed by name (sym
 
 cstruct = BType('cstruct: cstruct & struct in mem')     # will be laid out in memory using C struct rules
 
+
+# the following are supplied unboxed for performance reasons
 
 class _litint(int):
     def __new__(cls, *args_, **kwargs_):
@@ -71,9 +169,7 @@ class _litint(int):
         return self
     def __repr__(self):
         return f'litint({super().__repr__()})'
-def _asLitint(t, v):
-    return _litint(t, v)
-litint = BTAtom('litint', space=mem).setConstructor(_litint).setCoercer(_asLitint)
+litint = BType('litint: atom in mem').setConstructor(_litint).setCoercer(_litint)
 
 
 class _litnum(float):
@@ -94,7 +190,7 @@ class _litnum(float):
 litnum = BType('litnum: atom in mem').setConstructor(_litnum)
 
 
-class littxt_(str):
+class _littxt(str):
     def __new__(cls, *args_, **kwargs_):
         constr, args, kwargs = extractConstructors(args_, kwargs_)
         if len(args) == 1:
@@ -113,59 +209,33 @@ class littxt_(str):
         return self
     def __repr__(self):
         return f'littxt({super().__repr__()})'
-littxt = BType('littxt: atom in mem').setConstructor(littxt_)
+littxt = BType('littxt: atom in mem').setConstructor(_littxt)
 
 
-class tmptv:
-    __slots__ = ['_t_', '_v_', '_hash']
-    def __init__(self, _t, _v):
-        assert isinstance(_t, (BType, type))
-        self._t_ = _t
-        self._v_ = _v
-        self._hash = Missing
-    def __setattr__(self, key, value):
-        if key in ('_t_', '_v_', '_hash'):
-            super().__setattr__(key, value)
-        else:
-            raise AttributeError()
-    @property
-    def _t(self):
-        return self._t_
-    @property
-    def _v(self):
-        return self._v_
-    def __repr__(self):
-        return f'tv({self._t_},{self._v_})'
-    def __str__(self):
-        return f'<{self._t_}:{self._v_}>'
-    def __eq__(self, other):
-        if not isinstance(other, tv):
-            return False
-        else:
-            return (self._t_ == other._t_) and (self._v_ == other._v_)
-    def __hash__(self):
-        # tv will be hashable if it's type and value are hashable
-        if self._hash is Missing:
-            self._hash = hash((self._t, self._v))
-        return self._hash
+# parser / kenrel need to be able to construct litsym and litsyms - Jones's sym is a struct not a tv
 
 def _litsymCons(cls, *args, **kwargs):
+    # OPEN: handle str / txt to sym conversion
     if len(args) == 1:
-        return tmptv(litsym, args[0])
+        return _tv(litsym, args[0])
     elif len(args) == 2:
         t, v = args
         assert t == litsym
-        return tmptv(litsym, v)
+        return _tv(litsym, v)
     else:
         raise SyntaxError(f'No args passed')
-
 litsym = BTAtom('litsym', space=mem).setConstructor(_litsymCons)
-litsyms = BTAtom('litsyms', space=mem)
-litdate = BTAtom('litdate', space=mem)
+litsyms = BTAtom('litsyms', space=mem)   # OPEN: needs constructor
 
+
+# the structures for littup, litstruct and litframe are provided by libraries to be constructed by the kernel
 littup = BType('littup: littup & tup in mem')
 litstruct = BType('litstruct: litstruct & struct in mem')
 litframe = BType('litframe: litframe & frame in mem')
+litdate = BTAtom('litdate', space=mem)
+
+# OPEN: need litdatetime, litcitydatetime etc
+
 
 
 T = BType('T')

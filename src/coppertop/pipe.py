@@ -62,27 +62,22 @@ __all__ = [
 
 
 import inspect, types, builtins
-from collections import namedtuple
 
 import coppertop as coppertopMod
 coppertopMod.__version__ = "2025.05.01.1"
 from bones import jones
 
 from bones.core.context import context
-from coppertop._scopes import _CoWProxy, _UNDERSCORE
-from bones.core.errors import ProgrammerError, ErrSite, CPTBError, NotYetImplemented
-from bones.core.sentinels import Missing, function
+from coppertop._scopes import _UNDERSCORE
+from bones.core.errors import ErrSite, CPTBError, NotYetImplemented
+from bones.core.sentinels import Missing
 from bones.core.utils import raiseLess
-from bones.ts.metatypes import BType, fitsWithin as origFitsWithin, BTFn, BTTuple, BTAtom, \
-    BTOverload, _BTypeById, _btypeByClass
-from bones.lang.types import nullary, unary, binary, ternary
-from bones.ts.select import _ppType, selectFunction
-from bones.jones import BTypeError
+from bones.ts.metatypes import BType, fitsWithin as origFitsWithin, BTFn, BTTuple, BTAtom, _btypeByClass
+from bones.lang.types import nullary, unary, binary, ternary, _tvfunc
+from bones.ts.select import _Family, ppSig
 
 
 py = BType('py: atom in mem')
-DISABLE_RETURN_CHECK = False
-DISABLE_ARG_CHECK_FOR_SOLE_FN = False
 FN_ONLY_NAMES = []
 
 class CoppertopError(CPTBError): pass
@@ -102,27 +97,16 @@ class BModule(types.ModuleType):
             ) from None
         return answer
 
-# NOTE: bones modules live in sys._bmodules
-sys._bmodules = {'': BModule('')}
 
+sys._bmodules = {'': BModule('')}   # NOTE: bones modules live in sys._bmodules
+_unhandledTypes = set()             # OPEN: do we still need this?
 
-# for profiling
-# hits = 0; misses = 0; hitTime1 = 0; hitTime2 = 0; missTime1 = 0; missTime2 = 0
-# searchTime = 0 ;dispatchTime = 0; dispatchCount = 0; returnTime = 0; returnCount = 0
-
-# OPEN: do we still need this?
-_unhandledTypes = set()
-
-SelectionResult = namedtuple('SelectionResult', ['d', 'tByT'])
 
 _ = _UNDERSCORE
 MANDATORY = inspect._empty      # Python sentinel to indicate an argument has no default (i.e. is not optional)
 NO_ANNOTATION = inspect._empty  # Python sentinel to indicate an argument has no annotation
-BETTER_ERRORS = False
 SCRATCH = 'scratch'
 
-# OPEN: do we still need this?
-_SCTracker = []
 
 jonesFnByStyle = {
     nullary: jones._nullary,
@@ -147,7 +131,10 @@ def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEv
         updateUber = not local
         modname, bmod, umod, fnname, pymodFn, enclosingFnName, argNames, sig, tRet, pass_tByT = _fnContext(pyfn, 'registerFn', name)
 
-        fn = _Function(fnname, modname, style_, pyfn, dispatchEvenIfAllTypes, typeHelper, BTFn(sig, tRet), argNames, pass_tByT)
+        fn = _tvfunc(
+            name=fnname, modname=modname, style=style_, _v=pyfn, dispatchEvenIfAllTypes=dispatchEvenIfAllTypes,
+            typeHelper=typeHelper, _t=BTFn(sig, tRet), argNames=argNames, pass_tByT=pass_tByT
+        )
 
         # run some checks - establishing that pymodFn is a jones function with the congruent piping style
         if pymodFn:
@@ -167,55 +154,55 @@ def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEv
             return bf
         if enclosingFnName:
             if pymodFn is Missing:
-                return jonesFnByStyle[style_](fnname, modname + '.' + enclosingFnName, _Dispatcher(fn), _UNDERSCORE)
+                return jonesFnByStyle[style_](fnname, modname + '.' + enclosingFnName, _Family(fn), _UNDERSCORE)
             else:
-                return jonesFnByStyle[style_](fnname, modname + '.' + enclosingFnName, _Dispatcher(pymodFn.d, fn), _UNDERSCORE)
+                return jonesFnByStyle[style_](fnname, modname + '.' + enclosingFnName, _Family(pymodFn.d, fn), _UNDERSCORE)
         else:
             if pymodFn is Missing:
                 if bmodFn is Missing:
                     if uberFn is Missing:
-                        jf = jonesFnByStyle[style_](fnname, modname, _Dispatcher(fn), _UNDERSCORE)
+                        jf = jonesFnByStyle[style_](fnname, modname, _Family(fn), _UNDERSCORE)
                         bmod.__dict__[fnname] = jf
-                        if updateUber: umod.__dict__[fnname] = jonesFnByStyle[style_](fnname, '_', _Dispatcher(fn), _UNDERSCORE)
+                        if updateUber: umod.__dict__[fnname] = jonesFnByStyle[style_](fnname, '_', _Family(fn), _UNDERSCORE)
                         return jf
                     else:
-                        jf = jonesFnByStyle[style_](fnname, modname, _Dispatcher(fn), _UNDERSCORE)
+                        jf = jonesFnByStyle[style_](fnname, modname, _Family(fn), _UNDERSCORE)
                         bmod.__dict__[fnname] = jf
-                        if updateUber: umod.__dict__[fnname].d = _Dispatcher(uberFn.d, fn)
+                        if updateUber: umod.__dict__[fnname].d = _Family(uberFn.d, fn)
                         return jf
                 else:
                     if uberFn is Missing:
-                        jf = jonesFnByStyle[style_](fnname, modname, _Dispatcher(fn), _UNDERSCORE)
-                        bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, _Dispatcher(bmodFn.d, fn), _UNDERSCORE)
-                        if updateUber: umod.__dict__[fnname] = jonesFnByStyle[style_](fnname, '_', _Dispatcher(fn), _UNDERSCORE)
+                        jf = jonesFnByStyle[style_](fnname, modname, _Family(fn), _UNDERSCORE)
+                        bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, _Family(bmodFn.d, fn), _UNDERSCORE)
+                        if updateUber: umod.__dict__[fnname] = jonesFnByStyle[style_](fnname, '_', _Family(fn), _UNDERSCORE)
                         return jf
                     else:
-                        jf = jonesFnByStyle[style_](fnname, modname, _Dispatcher(fn), _UNDERSCORE)
-                        bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, _Dispatcher(bmodFn.d, fn), _UNDERSCORE)
-                        if updateUber: umod.__dict__[fnname].d = _Dispatcher(uberFn.d, fn)
+                        jf = jonesFnByStyle[style_](fnname, modname, _Family(fn), _UNDERSCORE)
+                        bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, _Family(bmodFn.d, fn), _UNDERSCORE)
+                        if updateUber: umod.__dict__[fnname].d = _Family(uberFn.d, fn)
                         return jf
             else:
                 if bmodFn is Missing:
                     if uberFn is Missing:
-                        jf = jonesFnByStyle[style_](fnname, modname, _Dispatcher(pymodFn.d, fn), _UNDERSCORE)
+                        jf = jonesFnByStyle[style_](fnname, modname, _Family(pymodFn.d, fn), _UNDERSCORE)
                         bmod.__dict__[fnname] = jf
-                        if updateUber: umod.__dict__[fnname] = jonesFnByStyle[style_](fnname, '_', _Dispatcher(pymodFn.d, fn), _UNDERSCORE)
+                        if updateUber: umod.__dict__[fnname] = jonesFnByStyle[style_](fnname, '_', _Family(pymodFn.d, fn), _UNDERSCORE)
                         return jf
                     else:
-                        jf = jonesFnByStyle[style_](fnname, modname, _Dispatcher(pymodFn.d, fn), _UNDERSCORE)
+                        jf = jonesFnByStyle[style_](fnname, modname, _Family(pymodFn.d, fn), _UNDERSCORE)
                         bmod.__dict__[fnname] = jf
-                        if updateUber: umod.__dict__[fnname].d = _Dispatcher(uberFn.d, jf.d)
+                        if updateUber: umod.__dict__[fnname].d = _Family(uberFn.d, jf.d)
                         return jf
                 else:
                     if uberFn is Missing:
-                        jf = jonesFnByStyle[style_](fnname, modname, _Dispatcher(pymodFn.d, fn), _UNDERSCORE)
-                        bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, _Dispatcher(bmodFn.d, jf.d), _UNDERSCORE)
-                        if updateUber: umod.__dict__[fnname] = jonesFnByStyle[style_](fnname, '_', _Dispatcher(pymodFn.d, fn), _UNDERSCORE)
+                        jf = jonesFnByStyle[style_](fnname, modname, _Family(pymodFn.d, fn), _UNDERSCORE)
+                        bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, _Family(bmodFn.d, jf.d), _UNDERSCORE)
+                        if updateUber: umod.__dict__[fnname] = jonesFnByStyle[style_](fnname, '_', _Family(pymodFn.d, fn), _UNDERSCORE)
                         return jf
                     else:
-                        jf = jonesFnByStyle[style_](fnname, modname, _Dispatcher(pymodFn.d, fn), _UNDERSCORE)
-                        bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, _Dispatcher(bmodFn.d, jf.d), _UNDERSCORE)
-                        if updateUber: umod.__dict__[fnname].d = _Dispatcher(uberFn.d, jf.d)
+                        jf = jonesFnByStyle[style_](fnname, modname, _Family(pymodFn.d, fn), _UNDERSCORE)
+                        bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, _Family(bmodFn.d, jf.d), _UNDERSCORE)
+                        if updateUber: umod.__dict__[fnname].d = _Family(uberFn.d, jf.d)
                         return jf
 
 
@@ -228,7 +215,7 @@ def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEv
         if len(args): raiseLess(TypeError('Only kwargs allowed', ErrSite("#2")))
         return registerFn
 
-# In general don't do this! However I want to be able to put libraries under the coppertop namespace and not have
+# In general don't do this! However, I want to be able to put libraries under the coppertop namespace and not have
 # `import coppertop.dm` which defines the local 'coppertop' as the module etc kybosh `from coppertop.pipe import *`
 # which defines the local 'coppertop' as the coppertop decorator.
 # See https://stackoverflow.com/questions/1060796/callable-modules for a discussion of this trick.
@@ -359,301 +346,6 @@ def _tArgFromAnnotation(annotation, modname, fnnameForErr, msgForErr):
 
 
 # **********************************************************************************************************************
-# Dispatch
-# **********************************************************************************************************************
-
-class _Function:
-
-    __slots__ = [
-        'style', 'name', '_t', 'modname', 'pyfn', '_argNames', 'sig', 'tArgs', 'tRet',
-        'pass_tByT', 'dispatchEvenIfAllTypes', 'typeHelper', '__doc__'
-     ]
-
-    def __init__(self, name, modname, style, pyfn, dispatchEvenIfAllTypes, typeHelper, _t, argNames, pass_tByT):
-        if not isinstance(_t, BTFn): raise TypeError('_t is not a BTFn')
-        self.name = name
-        self.modname = modname
-        self.style = style
-        self.pyfn = pyfn
-        self._argNames = argNames
-        self._t = _t
-        self.tArgs = _t.tArgs
-        self.tRet = _t.tRet
-        self.sig = _t.tArgs.types
-        self.pass_tByT = pass_tByT
-        self.dispatchEvenIfAllTypes = dispatchEvenIfAllTypes          # calls the function rather than returns the dispatch when all args are types
-        self.typeHelper = typeHelper
-        self.__doc__ = pyfn.__doc__ if hasattr(pyfn, '__doc__') else None
-
-    @property
-    def fullname(self):
-        return self.modname + '.' + self.name
-
-    @property
-    def numargs(self):
-        return len(self.sig)
-
-    def _tPartial(self, o_tbc):
-        return BTFn(BTTuple(*(self.sig[o] for o in o_tbc)), self.tRet)
-
-    def __repr__(self):
-        return self.name
-
-
-class _Dispatcher:
-
-    __slots__ = ['style', 'name', '_t_', 'fnBySigByNumArgs', 'cacheByNumArgs', '__doc__']
-
-    def __new__(cls, *dispatchers):
-        name = dispatchers[0].name
-        style = dispatchers[0].style
-        ds = []
-        maxNumArgs = 0
-
-        for d in dispatchers:
-            if isinstance(d, _Dispatcher):
-                for fnBySig in d.fnBySigByNumArgs:
-                    for d2 in fnBySig.values():
-                        if isinstance(d2, _Function):
-                            cls._checkDispatcher(d2, name, style)
-                            ds.append(d2)
-                        else:
-                            raiseLess(ProgrammerError("unknown dispatcher class", ErrSite(cls, "#5")))
-                if len(d.fnBySigByNumArgs) > maxNumArgs: maxNumArgs = len(d.fnBySigByNumArgs) - 1  # don't forget 0 args
-            elif isinstance(d, _Function):
-                cls._checkDispatcher(d, name, style)
-                if len(d.sig) > maxNumArgs: maxNumArgs = len(d.sig)
-                ds.append(d)
-            else:
-                raiseLess(ProgrammerError("unhandled dispatcher class", ErrSite(cls, "#11")))
-
-        fnBySigByNumArgs = [{} for i in range(maxNumArgs + 1)]
-        for d in ds:
-            oldD = fnBySigByNumArgs[len(d.sig)].get(d.sig, Missing)
-            # if oldD is not Missing and oldD.modname != d.modname:
-            #     raise CoppertopError(f'Found definition of {_ppFn(name, d.sig)} in "{d.modname}" and "{oldD.modname}"', ErrSite(cls, "#12"))
-            fnBySigByNumArgs[len(d.sig)][d.sig] = d
-        # if len(fnBySigByNumArgs) == 1 and len(fnBySigByNumArgs[0]) == 1:
-        #     # this can occur in a REPL where a function is being redefined
-        #     # SHOULDDO think this through as potentially we could overload functions in the repl accidentally which
-        #     #  would be profoundly confusing
-        #     return d
-        instance = super().__new__(cls)
-        instance.name = name
-        instance.style = style
-        instance.fnBySigByNumArgs = fnBySigByNumArgs
-        instance.cacheByNumArgs = [Missing] * (maxNumArgs + 1)
-        instance._t_ = Missing
-        instance.__doc__ = None
-        return instance
-
-    @classmethod
-    def _checkDispatcher(cls, d, name, style):
-        if d.name != name:
-            raiseLess(ProgrammerError(
-                f'Incompatible name - trying to overload function "{d.name}" with existing function "{name}"',
-                ErrSite(cls, "#1")))
-        if d.style != style:
-            raiseLess(ProgrammerError(
-                f'Incompatible style - tyring to overload {d.dtyle} function "{d.name}" with existing {style} function "{name}"',
-                ErrSite(cls, "#10")))
-
-    def selectFn(self, args):
-        numArgs = len(args)
-        if numArgs == 0:
-            fn = self.fnBySigByNumArgs[0][()]
-            tByT = {}
-            hasValue = True
-        else:
-            # ensure we have a cache
-            if numArgs > len(self.cacheByNumArgs) - 1:
-                raise TypeError(f"Too many args passed to  {self.name} - max {len(self.cacheByNumArgs) - 1}, passed {numArgs}")
-
-            if DISABLE_ARG_CHECK_FOR_SOLE_FN and len(fns := self.fnBySigByNumArgs[numArgs]) == 1:
-                return firstValue(fns), {}, True
-
-            if (cache := self.cacheByNumArgs[numArgs]) is Missing:
-                pSC = jones.sc_new(numArgs, 100)
-                cache = self.cacheByNumArgs[numArgs] = (pSC, [])
-                _SCTracker.append((self, numArgs, pSC))
-            pSC, results = cache
-
-            hasValue = jones.sc_fillQuerySlotWithBTypesOf(pSC, args, _btypeByClass, py, _CoWProxy)
-
-            # t2 = time.perf_counter_ns()
-            resultId = jones.sc_getFnId(pSC)
-            # t3 = time.perf_counter_ns()
-
-            if resultId == 0:
-                # missTime1 += t2 - t1; missTime2 += t3 - t2; misses += 1
-                tArgs = jones.sc_tArgsFromQuery(pSC, _BTypeById)
-                fn, tByT, distance, argDistances = selectFunction(tArgs, self.fnBySigByNumArgs[numArgs], py, self.name, self.fnBySigByNumArgs)
-                results.append((fn, tByT))
-                pQuery = jones.sc_queryPtr(pSC)
-                iNext = jones.sc_nextFreeArrayIndex(pSC)
-                if iNext == 0:
-                    raise RuntimeError("Array not big enough")
-                jones.sc_atArrayPut(pSC, iNext, pQuery, len(results))
-                # searchTime += time.perf_counter_ns() - t3; dispatchTime += t3 - t1
-            else:
-                # hitTime1 += t2 - t1; hitTime2 += t3 - t2; hits += 1; dispatchTime += t3 - t1
-                fn, tByT = results[resultId - 1]
-        return fn, tByT, hasValue
-
-    def __call__(self, *args):
-        # global hits, misses, hitTime1, hitTime2, missTime1, missTime2, searchTime, dispatchTime, dispatchCount, returnTime, returnCount
-        # t1 = time.perf_counter_ns()
-
-        if DISABLE_ARG_CHECK_FOR_SOLE_FN:
-            numArgs = len(args)
-            if numArgs <= len(self.fnBySigByNumArgs):
-                if len(fns := self.fnBySigByNumArgs[numArgs]) == 1:
-                    fn = firstValue(fns)
-                    if not fn.pass_tByT:
-                        return fn.pyfn(*args)
-
-        fn, tByT, hasValue = self.selectFn(args)
-
-        # t4 = time.perf_counter_ns()
-
-        if hasValue or fn.dispatchEvenIfAllTypes:
-            if fn.pass_tByT:
-                if fn.typeHelper:
-                    tByT = fn.typeHelper(*args, tByT=tByT)
-                # dispatchTime += time.perf_counter_ns() - t4; dispatchCount += 1
-                ret = fn.pyfn(*args, tByT=tByT)
-                if DISABLE_RETURN_CHECK:
-                    return ret
-                # t5 = time.perf_counter_ns()
-            else:
-                if BETTER_ERRORS:
-                    # better error messages
-                    # instead of the Python one:
-                    #       TypeError: createBag() missing 1 required positional argument: 'otherHandSizesById'
-                    #
-                    # TypeError: createBag() does match createBag(handId:any, hand:any, otherHandSizesById:any) -> cluedo_bag
-                    # even better say we can't find a match for two arguments
-                    try:
-                        # dispatchTime += time.perf_counter_ns() - t4; dispatchCount += 1
-                        ret = fn.pyfn(*args)
-                        if DISABLE_RETURN_CHECK:
-                            return ret
-                        # t5 = time.perf_counter_ns()
-                    except TypeError as ex:
-                        if ex.args and ' required positional argument' in ex.args[0]:
-                            print(_sig(fn), file=sys.stderr)
-                            print(ex.args[0], file=sys.stderr)
-                        raiseLess(ex, True)
-                        # argTs = [_ppType(argT) for argT in args]
-                        # retT = _ppType(x.tRet)
-                        # return f'({",".join(argTs)})->{retT} <{x.style.name}>  :   in {x.fullname}'
-                else:
-                    # dispatchTime += time.perf_counter_ns() - t4; dispatchCount += 1
-                    ret = fn.pyfn(*args)
-                    if DISABLE_RETURN_CHECK:
-                        return ret
-                    # t5 = time.perf_counter_ns()
-            tRet = fn.tRet
-
-            if tRet == py or isinstance(ret, SelectionResult):
-                # returnTime += time.perf_counter_ns() - t5; returnCount += 1
-                return ret
-            else:
-                # MUSTDO
-                # BTTuples are products whereas pytuples are exponentials therefore we can reliably type check an answered
-                # sequence if the return type is BTTuple (and possibly BTStruct) - also BTTuple can be coerced by default to
-                # a dseq (or similar - may should add a new tuple subclass to prevent it being treated like an exponential)
-                # add a note in bones that one of our basic ideas / building blocks is things and exponentials of things
-                if hasattr(ret, '_t'):
-                    if ret._t:
-                        # check the actual return type fits the declared return type
-                        if origFitsWithin(ret._t, tRet):
-                            return ret
-                        else:
-                            raiseLess(BTypeError(f'{fn.fullname} returned a {str(_typeOf(ret))} should have have returned a {tRet} {tByT}',ErrSite("#1")))
-                    else:
-                        return ret | tRet
-                else:
-                    # use the coercer rather than impose construction with tv
-                    if origFitsWithin(typeOf(ret), tRet):
-                        return ret
-                    else:
-                        return ret | tRet
-
-        else:
-            # dispatchTime += time.perf_counter_ns() - t4; dispatchCount += 1
-            return SelectionResult(fn, tByT)
-
-
-    def _tPartial(self, num_args, o_tbc):
-        # if this is a bottle neck can be cached
-        ts = []
-        for fn in self.fnBySigByNumArgs[num_args].values():
-            ts.append(fn._tPartial(o_tbc))
-        return BTOverload(*ts)
-
-    @property
-    def _t(self):
-        if self._t_ is Missing:
-            ts = []
-            for fnBySig in self.fnBySigByNumArgs:
-                for fn in fnBySig.values():
-                    ts.append(fn._t)
-            self._t_ = BTOverload(*ts)
-        return self._t_
-
-    def __repr__(self):
-        return self.name
-
-def firstValue(d):
-    # https://stackoverflow.com/questions/30362391/how-do-you-find-the-first-key-in-a-dictionary
-    for v in d.values():
-        return v
-    raise ProgrammerError(f'd is empty')
-
-
-# **********************************************************************************************************************
-# Utilities
-# **********************************************************************************************************************
-
-
-def _typeOf(x):
-    if hasattr(x, '_t'):
-        return x._t                     # it's a tv of some sort so return the t
-    elif isinstance(x, jones._fn):
-        return x.d._t
-    elif isinstance(x, jones._pfn):
-        return x.d._tPartial(x.num_args, x.o_tbc)
-    elif isinstance(x, BType):
-        return x
-    else:
-        t = builtins.type(x)
-        if t is _CoWProxy:
-            t = builtins.type(x._target)         # return the type of thing being proxied
-        return _btypeByClass.get(t, t)       # type python types as their bones equivalent
-
-sys._typeOf = _typeOf               # required by coercion - do not remove
-
-def _sig(x):
-    if isinstance(x, function):
-        return f'{x.__name__} is a Python function'
-    x = x.d
-    if isinstance(x, _Dispatcher):
-        answer = []
-        for fnBySig in x.fnBySigByNumArgs:
-            for sig, d in fnBySig.items():
-                argTs = [_ppType(argT) for argT in sig]
-                retT = _ppType(d.tRet)
-                answer.append(f'({",".join(argTs)})->{retT} <{d.style.name}>  :   in {d.fullname}')
-        return answer
-    else:
-        argTs = [_ppType(argT) for argT in x.sig]
-        retT = _ppType(x.tRet)
-        return f'({",".join(argTs)})->{retT} <{x.style.name}>  :   in {x.fullname}'
-
-
-
-# **********************************************************************************************************************
 # IMPORT HOOK
 # **********************************************************************************************************************
 
@@ -681,21 +373,21 @@ def _importFromBonesModule(frombmodName, frombmod, tobmodname, tobmod, importers
             if not isinstance(addition, (jones._fn, jones._pfn)) and not isinstance(addition, BType):
                 raise CoppertopImportError(f'Trying to import "{n}" which is a {type(addition)}')
             if current is Missing:
-                tobmod.__dict__[n] = addition.__class__(n, tobmodname, _Dispatcher(addition.d), _UNDERSCORE)
+                tobmod.__dict__[n] = addition.__class__(n, tobmodname, _Family(addition.d), _UNDERSCORE)
             else:
-                tobmod.__dict__[n] = current.__class__(n, tobmodname, _Dispatcher(current.d, addition.d), _UNDERSCORE)
+                tobmod.__dict__[n] = current.__class__(n, tobmodname, _Family(current.d, addition.d), _UNDERSCORE)
             thingsToImport[n] = addition
         elif isinstance(pymodJf, (jones._fn, jones._pfn)):
             if isinstance(addition, (jones._fn, jones._pfn)):
                 # overload current and addition
                 if current is Missing:
-                    tobmod.__dict__[n] = addition.__class__(n, tobmodname, _Dispatcher(addition.d), _UNDERSCORE)
-                    thingsToImport[n] = addition.__class__(n, tobmodname, _Dispatcher(pymodJf.d, addition.d), _UNDERSCORE)
+                    tobmod.__dict__[n] = addition.__class__(n, tobmodname, _Family(addition.d), _UNDERSCORE)
+                    thingsToImport[n] = addition.__class__(n, tobmodname, _Family(pymodJf.d, addition.d), _UNDERSCORE)
                 else:
                     if _styleOfFn(current) != _styleOfFn(addition):
                         raise CoppertopImportError(f'"{n} is a {_styleOfFn(current)} in {tobmodname} but a {_styleOfFn(addition)} in {frombmodName}')
-                    tobmod.__dict__[n] = current.__class__(n, tobmodname, _Dispatcher(current.d, addition.d), _UNDERSCORE)
-                    thingsToImport[n] = current.__class__(current.name, tobmodname, _Dispatcher(pymodJf.d, addition.d), _UNDERSCORE)
+                    tobmod.__dict__[n] = current.__class__(n, tobmodname, _Family(current.d, addition.d), _UNDERSCORE)
+                    thingsToImport[n] = current.__class__(current.name, tobmodname, _Family(pymodJf.d, addition.d), _UNDERSCORE)
             elif isinstance(addition, BType):
                 raise NotYetImplemented("overloading type and jonesFn")
             else:
@@ -771,16 +463,15 @@ def makeFn(*args):
     modname, bmod, umod, fnname, priorPy, enclosingFnName, argNames, sig, tRet, pass_tByT = _fnContext(pyfn, 'anon', name)
     if _t is Missing:
         _t = BTFn(BTTuple(*[py] * len(argNames)), py)
-    fn = _Function(
-        name=fnname, modname=modname,
-        style=unary, pyfn=pyfn, dispatchEvenIfAllTypes=False, typeHelper=Missing, _t=_t, argNames=argNames, pass_tByT=False
+    tvfunc = _tvfunc(
+        name=fnname, modname=modname, style=unary, _v=pyfn, dispatchEvenIfAllTypes=False,
+        typeHelper=Missing, _t=_t, argNames=argNames, pass_tByT=False
     )
-    d = _Dispatcher(fn)
-    return jones._unary(fnname, modname, d, _UNDERSCORE)
+    return jones._unary(fnname, modname, _Family(tvfunc), _UNDERSCORE)
 
 @coppertop
 def sig(x):
-    return _sig(x)
+    return ppSig(x)
 
 @coppertop(dispatchEvenIfAllTypes=True)
 def type(x):
@@ -788,7 +479,7 @@ def type(x):
 
 @coppertop(dispatchEvenIfAllTypes=True)
 def typeOf(x):
-    return _typeOf(x)
+    return sys._typeOf(x)
 
 
 

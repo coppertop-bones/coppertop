@@ -293,7 +293,7 @@ class BType(BTypeRoot):
         elif not isinstance(rhs, BType):
             raise BTypeError(f'rhs should be a BType or type - got {repr(rhs)}')
         if self.__class__ is BTFn:
-            return BTOverload(self, rhs)
+            return BTFamily(self, rhs)
         else:
             return BTIntersection(self, rhs)
 
@@ -303,7 +303,7 @@ class BType(BTypeRoot):
         elif not isinstance(lhs, BType):
             raise BTypeError(f'lhs should be a BType or type - got {repr(lhs)}')
         if self.__class__ is BTFn:
-            return BTOverload(lhs, self)
+            return BTFamily(lhs, self)
         else:
             return BTIntersection(lhs, self)
 
@@ -318,7 +318,7 @@ class BType(BTypeRoot):
             raise TypeError()
         else:
             if self.__class__ is BTFn:
-                return BTOverload(self, rhs)
+                return BTFamily(self, rhs)
             else:
                 return BTIntersection(self, rhs)
 
@@ -469,7 +469,7 @@ class BTIntersection(BType):
 
 
 
-class BTOverload(BTIntersection):
+class BTFamily(BTIntersection):
 
     def ppT(self):
         if a := self.ppName(): return a
