@@ -20,7 +20,8 @@ __all__ = [
     'tup', 'struct', 'frame',
     'litint', 'litnum', 'littxt', 'litsym', 'litsyms', 'litdate', 'litframe', 'littup', 'litstruct',
     'T', 'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9',
-    '_tv', '_tvfunc'
+    '_tv', '_tvfunc',
+    'btype',
 ]
 
 from bones.core.sentinels import Null, Void, Missing
@@ -236,6 +237,11 @@ litdate = BTAtom('litdate', space=mem)
 
 # OPEN: need litdatetime, litcitydatetime etc
 
+btype = BType('btype: atom in mem')
+
+__all__ += [
+    'btype'
+]
 
 
 T = BType('T')

@@ -144,8 +144,8 @@ handlersByErrSiteId = {
 
     ('__main__', Missing, 'importStuff', "Can't find name") : '...',
 
-    ('bones.lang.parse_phrase', Missing, 'parsePhrase', 'unknown function') : '...',
-    ('bones.lang.parse_phrase', Missing, 'parsePhrase', 'unknown name') : '...',
-    ('bones.lang.parse_phrase', Missing, 'parsePhrase', 'name already defined'): '...',
+    ('bones.parse.parse_phrase', Missing, 'parsePhrase', 'unknown function') : '...',
+    ('bones.parse.parse_phrase', Missing, 'parsePhrase', 'unknown name') : '...',
+    ('bones.parse.parse_phrase', Missing, 'parsePhrase', 'name already defined'): '...',
 
 }

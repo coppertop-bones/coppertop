@@ -18,7 +18,7 @@ from bones.ts.metatypes import updateSchemaVarsWith, fitsWithin, BTFamily, BType
 from bones.ts.core import SchemaError, BTypeError
 from bones.core.utils import raiseLess, firstValue
 
-from bones.lang.types import _tvfunc
+from bones.lang.types import _tvfunc, btype
 from bones import jones
 from coppertop._scopes import _CoWProxy
 
@@ -40,12 +40,14 @@ class _Family:
     __slots__ = ['style', 'name', '_t', '_fnBySigByNumArgs', '_cacheByNumArgs', '__doc__']
 
     def __new__(cls, *tvfuncs):
-        name = tvfuncs[0].name
-        style = tvfuncs[0].style
+        name = Missing
+        style = Missing
         ds = []
         maxNumArgs = 0
 
         for tvfunc in tvfuncs:
+            if not tvfunc: continue
+            if name is Missing: name, style = tvfunc.name, tvfunc.style
             if isinstance(tvfunc, _Family):
                 for fnBySig in tvfunc._fnBySigByNumArgs:
                     for d2 in fnBySig.values():
@@ -308,7 +310,10 @@ def selectFunction(callerSig, fnBySig, catchAllType, fnNameForErr, familyFnForEr
         # DOES_NOT_UNDERSTAND - no matches or fallbacks
         with context(showFullType=True):
             caller = _ppFn(fnNameForErr, callerSig)
-            context.EE(f'No matches for {caller}')
+            context.EE(f'No matches for {caller} in:')
+            for sig, fn in fnBySig.items():
+                callee = f'{_ppFn(fn.name, sig)}) - {fn.fullname} defined in {fn.modname}'
+                context.EE(f'  {callee}')
         raiseLess(BTypeError(f'No matches for {caller}'), ErrSite("#1"))
 
 
@@ -325,7 +330,7 @@ def _typeOf(x):
     elif isinstance(x, jones._pfn):
         return x.d._tPartial(x.num_args, x.o_tbc)
     elif isinstance(x, BType):
-        return x
+        return btype
     else:
         t = builtins.type(x)
         if t is _CoWProxy:

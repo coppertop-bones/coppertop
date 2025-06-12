@@ -458,7 +458,7 @@ class BTIntersection(BType):
         hasCompound = False
         for t in self.types:
             if t.id == self.id:
-                pp, compound, childCompound = 'self', False, False
+                pp, compound, childCompound = self.name, False, False
             elif isinstance(t, BType):
                 pp, compound, childCompound = ppT(t)
             else:

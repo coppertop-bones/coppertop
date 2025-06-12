@@ -57,7 +57,7 @@ if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 __all__ = [
     'coppertop', 'nullary', 'unary', 'binary', 'ternary', '_', 'sig', 'context', 'typeOf', 'makeFn',
-    'fitsWithin', 'type', 'SCRATCH'
+    'fitsWithin', 'type'
 ]
 
 
@@ -444,7 +444,7 @@ if not hasattr(sys, '_coppertopImportFnHolder'):
 
 
 # **********************************************************************************************************************
-# essential public functions - put into bones.core?
+# essential public functions
 # **********************************************************************************************************************
 
 @coppertop(style=binary, dispatchEvenIfAllTypes=True)
