@@ -34,7 +34,7 @@ from bones.ts._type_lang.jones_type_manager import _btypeByClass, _BTypeById    
 from bones.ts.type_lang import TypeLangInterpreter
 
 from bones.core.errors import ProgrammerError, NotYetImplemented, PathNotTested
-from bones.core.sentinels import Missing, Void, generator
+from bones.core.sentinels import Missing
 
 
 _verboseNames = False
@@ -215,8 +215,13 @@ def fitsWithin(a, b, *, fittingSigs=False):
                 # generally `BType <: Python type` cannot be true, however, what about pydict <: dict, a A * B <: tuple
                 return DOES_NOT_FIT
         elif isinstance(b, BType):
-            if a.id == b.id: return IDENTICAL
-            cacheId = (a.id, b.id)
+            if b == btype:
+                # any BType <: btype
+                return Fits(True, {}, 0)
+            elif a.id == b.id:
+                return IDENTICAL
+            else:
+                cacheId = (a.id, b.id)
         else:
             raise TypeError('fitsWithin only supports Python types and BTypes')
         if a.hasT:
@@ -864,3 +869,6 @@ def _find(needle, haystack):
 def determineRetType(md, schemaVars, sigCaller):
     raise NotYetImplemented()
 
+
+btype = BType('btype: atom in mem')
+TBI = BType('TBI: atom in mem')         # To Be Inferred - OPEN: define in jones

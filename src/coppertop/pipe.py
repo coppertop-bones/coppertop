@@ -73,8 +73,8 @@ from bones.core.errors import ErrSite, CPTBError, NotYetImplemented
 from bones.core.sentinels import Missing
 from bones.core.utils import raiseLess
 from bones.ts.metatypes import BType, fitsWithin as origFitsWithin, BTFn, BTTuple, BTAtom, _btypeByClass
-from bones.lang.types import nullary, unary, binary, ternary, _tvfunc
-from bones.ts.select import _Family, ppSig
+from bones.lang.types import nullary, unary, binary, ternary, _tvfunc, btype
+from bones.ts.select import Family, ppSig
 
 
 py = BType('py: atom in mem')
@@ -154,55 +154,55 @@ def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEv
             return bf
         if enclosingFnName:
             if pymodFn is Missing:
-                return jonesFnByStyle[style_](fnname, modname + '.' + enclosingFnName, _Family(fn), _UNDERSCORE)
+                return jonesFnByStyle[style_](fnname, modname + '.' + enclosingFnName, Family(fn), _UNDERSCORE)
             else:
-                return jonesFnByStyle[style_](fnname, modname + '.' + enclosingFnName, _Family(pymodFn.d, fn), _UNDERSCORE)
+                return jonesFnByStyle[style_](fnname, modname + '.' + enclosingFnName, Family(pymodFn.d, fn), _UNDERSCORE)
         else:
             if pymodFn is Missing:
                 if bmodFn is Missing:
                     if uberFn is Missing:
-                        jf = jonesFnByStyle[style_](fnname, modname, _Family(fn), _UNDERSCORE)
+                        jf = jonesFnByStyle[style_](fnname, modname, Family(fn), _UNDERSCORE)
                         bmod.__dict__[fnname] = jf
-                        if updateUber: umod.__dict__[fnname] = jonesFnByStyle[style_](fnname, '_', _Family(fn), _UNDERSCORE)
+                        if updateUber: umod.__dict__[fnname] = jonesFnByStyle[style_](fnname, '_', Family(fn), _UNDERSCORE)
                         return jf
                     else:
-                        jf = jonesFnByStyle[style_](fnname, modname, _Family(fn), _UNDERSCORE)
+                        jf = jonesFnByStyle[style_](fnname, modname, Family(fn), _UNDERSCORE)
                         bmod.__dict__[fnname] = jf
-                        if updateUber: umod.__dict__[fnname].d = _Family(uberFn.d, fn)
+                        if updateUber: umod.__dict__[fnname].d = Family(uberFn.d, fn)
                         return jf
                 else:
                     if uberFn is Missing:
-                        jf = jonesFnByStyle[style_](fnname, modname, _Family(fn), _UNDERSCORE)
-                        bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, _Family(bmodFn.d, fn), _UNDERSCORE)
-                        if updateUber: umod.__dict__[fnname] = jonesFnByStyle[style_](fnname, '_', _Family(fn), _UNDERSCORE)
+                        jf = jonesFnByStyle[style_](fnname, modname, Family(fn), _UNDERSCORE)
+                        bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, Family(bmodFn.d, fn), _UNDERSCORE)
+                        if updateUber: umod.__dict__[fnname] = jonesFnByStyle[style_](fnname, '_', Family(fn), _UNDERSCORE)
                         return jf
                     else:
-                        jf = jonesFnByStyle[style_](fnname, modname, _Family(fn), _UNDERSCORE)
-                        bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, _Family(bmodFn.d, fn), _UNDERSCORE)
-                        if updateUber: umod.__dict__[fnname].d = _Family(uberFn.d, fn)
+                        jf = jonesFnByStyle[style_](fnname, modname, Family(fn), _UNDERSCORE)
+                        bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, Family(bmodFn.d, fn), _UNDERSCORE)
+                        if updateUber: umod.__dict__[fnname].d = Family(uberFn.d, fn)
                         return jf
             else:
                 if bmodFn is Missing:
                     if uberFn is Missing:
-                        jf = jonesFnByStyle[style_](fnname, modname, _Family(pymodFn.d, fn), _UNDERSCORE)
+                        jf = jonesFnByStyle[style_](fnname, modname, Family(pymodFn.d, fn), _UNDERSCORE)
                         bmod.__dict__[fnname] = jf
-                        if updateUber: umod.__dict__[fnname] = jonesFnByStyle[style_](fnname, '_', _Family(pymodFn.d, fn), _UNDERSCORE)
+                        if updateUber: umod.__dict__[fnname] = jonesFnByStyle[style_](fnname, '_', Family(pymodFn.d, fn), _UNDERSCORE)
                         return jf
                     else:
-                        jf = jonesFnByStyle[style_](fnname, modname, _Family(pymodFn.d, fn), _UNDERSCORE)
+                        jf = jonesFnByStyle[style_](fnname, modname, Family(pymodFn.d, fn), _UNDERSCORE)
                         bmod.__dict__[fnname] = jf
-                        if updateUber: umod.__dict__[fnname].d = _Family(uberFn.d, jf.d)
+                        if updateUber: umod.__dict__[fnname].d = Family(uberFn.d, jf.d)
                         return jf
                 else:
                     if uberFn is Missing:
-                        jf = jonesFnByStyle[style_](fnname, modname, _Family(pymodFn.d, fn), _UNDERSCORE)
-                        bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, _Family(bmodFn.d, jf.d), _UNDERSCORE)
-                        if updateUber: umod.__dict__[fnname] = jonesFnByStyle[style_](fnname, '_', _Family(pymodFn.d, fn), _UNDERSCORE)
+                        jf = jonesFnByStyle[style_](fnname, modname, Family(pymodFn.d, fn), _UNDERSCORE)
+                        bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, Family(bmodFn.d, jf.d), _UNDERSCORE)
+                        if updateUber: umod.__dict__[fnname] = jonesFnByStyle[style_](fnname, '_', Family(pymodFn.d, fn), _UNDERSCORE)
                         return jf
                     else:
-                        jf = jonesFnByStyle[style_](fnname, modname, _Family(pymodFn.d, fn), _UNDERSCORE)
-                        bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, _Family(bmodFn.d, jf.d), _UNDERSCORE)
-                        if updateUber: umod.__dict__[fnname].d = _Family(uberFn.d, jf.d)
+                        jf = jonesFnByStyle[style_](fnname, modname, Family(pymodFn.d, fn), _UNDERSCORE)
+                        bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, Family(bmodFn.d, jf.d), _UNDERSCORE)
+                        if updateUber: umod.__dict__[fnname].d = Family(uberFn.d, jf.d)
                         return jf
 
 
@@ -373,21 +373,21 @@ def _importFromBonesModule(frombmodName, frombmod, tobmodname, tobmod, importers
             if not isinstance(addition, (jones._fn, jones._pfn)) and not isinstance(addition, BType):
                 raise CoppertopImportError(f'Trying to import "{n}" which is a {type(addition)}')
             if current is Missing:
-                tobmod.__dict__[n] = addition.__class__(n, tobmodname, _Family(addition.d), _UNDERSCORE)
+                tobmod.__dict__[n] = addition.__class__(n, tobmodname, Family(addition.d), _UNDERSCORE)
             else:
-                tobmod.__dict__[n] = current.__class__(n, tobmodname, _Family(current.d, addition.d), _UNDERSCORE)
+                tobmod.__dict__[n] = current.__class__(n, tobmodname, Family(current.d, addition.d), _UNDERSCORE)
             thingsToImport[n] = addition
         elif isinstance(pymodJf, (jones._fn, jones._pfn)):
             if isinstance(addition, (jones._fn, jones._pfn)):
                 # overload current and addition
                 if current is Missing:
-                    tobmod.__dict__[n] = addition.__class__(n, tobmodname, _Family(addition.d), _UNDERSCORE)
-                    thingsToImport[n] = addition.__class__(n, tobmodname, _Family(pymodJf.d, addition.d), _UNDERSCORE)
+                    tobmod.__dict__[n] = addition.__class__(n, tobmodname, Family(addition.d), _UNDERSCORE)
+                    thingsToImport[n] = addition.__class__(n, tobmodname, Family(pymodJf.d, addition.d), _UNDERSCORE)
                 else:
                     if _styleOfFn(current) != _styleOfFn(addition):
                         raise CoppertopImportError(f'"{n} is a {_styleOfFn(current)} in {tobmodname} but a {_styleOfFn(addition)} in {frombmodName}')
-                    tobmod.__dict__[n] = current.__class__(n, tobmodname, _Family(current.d, addition.d), _UNDERSCORE)
-                    thingsToImport[n] = current.__class__(current.name, tobmodname, _Family(pymodJf.d, addition.d), _UNDERSCORE)
+                    tobmod.__dict__[n] = current.__class__(n, tobmodname, Family(current.d, addition.d), _UNDERSCORE)
+                    thingsToImport[n] = current.__class__(current.name, tobmodname, Family(pymodJf.d, addition.d), _UNDERSCORE)
             elif isinstance(addition, BType):
                 raise NotYetImplemented("overloading type and jonesFn")
             else:
@@ -467,7 +467,7 @@ def makeFn(*args):
         name=fnname, modname=modname, style=unary, _v=pyfn, dispatchEvenIfAllTypes=False,
         typeHelper=Missing, _t=_t, argNames=argNames, pass_tByT=False
     )
-    return jones._unary(fnname, modname, _Family(tvfunc), _UNDERSCORE)
+    return jones._unary(fnname, modname, Family(tvfunc), _UNDERSCORE)
 
 @coppertop
 def sig(x):
@@ -478,7 +478,7 @@ def type(x):
     return builtins.type(x)
 
 @coppertop(dispatchEvenIfAllTypes=True)
-def typeOf(x):
+def typeOf(x) -> btype:
     return sys._typeOf(x)
 
 

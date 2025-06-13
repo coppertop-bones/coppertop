@@ -26,6 +26,7 @@ __all__ = [
 
 from bones.core.sentinels import Null, Void, Missing
 from bones.ts.metatypes import BTAtom, BType, extractConstructors, BTFn, BTTuple
+from bones.ts.select import TBI, _tvfunc, btype
 
 
 
@@ -75,53 +76,10 @@ class _tv:
 
 
 # **********************************************************************************************************************
-# function structure
-# **********************************************************************************************************************
-
-class _tvfunc:
-
-    __slots__ = [
-        'style', 'name', '_t', 'modname', '_v', '_argNames', 'sig', 'tArgs', 'tRet',
-        'pass_tByT', 'dispatchEvenIfAllTypes', 'typeHelper', '__doc__'
-     ]
-
-    def __init__(self, *, name, modname, style, _v, dispatchEvenIfAllTypes, typeHelper, _t, argNames, pass_tByT):
-        if not isinstance(_t, BTFn): raise TypeError('_t is not a BTFn')
-        self.name = name
-        self.modname = modname
-        self.style = style
-        self._v = _v
-        self._argNames = argNames
-        self._t = _t
-        self.tArgs = _t.tArgs
-        self.tRet = _t.tRet
-        self.sig = _t.tArgs.types
-        self.pass_tByT = pass_tByT
-        self.dispatchEvenIfAllTypes = dispatchEvenIfAllTypes          # calls the function rather than returns the dispatch when all args are types
-        self.typeHelper = typeHelper
-        self.__doc__ = _v.__doc__ if hasattr(_v, '__doc__') else None
-
-    @property
-    def fullname(self):
-        return self.modname + '.' + self.name
-
-    @property
-    def numargs(self):
-        return len(self.sig)
-
-    def _tPartial(self, o_tbc):
-        return BTFn(BTTuple(*(self.sig[o] for o in o_tbc)), self.tRet)
-
-    def __repr__(self):
-        return self.name
-
-
-
-# **********************************************************************************************************************
 # bones langauge types and structures
 # **********************************************************************************************************************
 
-mem = BType('mem')                      # the memory space
+mem = BType('mem')                      # the memory space - defined in jones
 
 noun = BTAtom("noun")
 nullary = BTAtom("nullary")
@@ -129,7 +87,6 @@ unary = BTAtom("unary")
 binary = BTAtom("binary")
 ternary = BTAtom("ternary")
 
-TBI = BTAtom("TBI", space=mem)
 void = BTAtom('void', space=mem)        # something that isn't there and shouldn't be there
 null = BTAtom('null')                   # the null set - something that isn't there and that's okay
 missing = BTAtom('missing')             # something that isn't there but should be - considered an error
@@ -237,7 +194,6 @@ litdate = BTAtom('litdate', space=mem)
 
 # OPEN: need litdatetime, litcitydatetime etc
 
-btype = BType('btype: atom in mem')
 
 __all__ += [
     'btype'

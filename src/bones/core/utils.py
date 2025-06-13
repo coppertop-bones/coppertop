@@ -60,13 +60,13 @@ def raiseLess(ex, includeMe=True):
 
 def firstKey(d):
     # https://stackoverflow.com/questions/30362391/how-do-you-find-the-first-key-in-a-dictionary
-    for k in d:
+    for k, v in d.items():
         return k
     raise ProgrammerError(f'd is empty')
 
 def firstValue(d):
     # https://stackoverflow.com/questions/30362391/how-do-you-find-the-first-key-in-a-dictionary
-    for v in d.values():
+    for k, v in d.items():
         return v
     raise ProgrammerError(f'd is empty')
 
