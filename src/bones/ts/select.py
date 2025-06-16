@@ -28,6 +28,7 @@ py = BType('py: atom in mem')
 
 DISABLE_RETURN_CHECK = False
 DISABLE_ARG_CHECK_FOR_SOLE_FN = False
+SHOW_ARGNAMES = True
 
 SelectionResult = collections.namedtuple('SelectionResult', ['tvfunc', 'tByT'])
 
@@ -40,7 +41,7 @@ SelectionResult = collections.namedtuple('SelectionResult', ['tvfunc', 'tByT'])
 class _tvfunc:
 
     __slots__ = [
-        'style', 'name', '_t', 'modname', '_v', '_argNames', 'sig', 'tArgs', 'tRet',
+        'style', 'name', '_t', 'modname', '_v', 'argNames', 'sig', 'tArgs', 'tRet',
         'pass_tByT', 'dispatchEvenIfAllTypes', 'typeHelper', '__doc__'
      ]
 
@@ -50,7 +51,7 @@ class _tvfunc:
         self.modname = modname
         self.style = style
         self._v = _v
-        self._argNames = argNames
+        self.argNames = argNames
         self._t = _t
         self.tArgs = _t.tArgs
         self.tRet = _t.tRet
@@ -118,6 +119,11 @@ class _tvfunc:
     def __repr__(self):
         return self.name
 
+    def ppSig(self):
+        if SHOW_ARGNAMES:
+            return f'{self.name}({",".join([_ppType(t) for t in self.sig])}) -> {self.tRet}'
+        else:
+            return f'{self.name}({",".join([f"{n}:{_ppType(t)}" for t, n in zip(self.sig, self.argNames)])}) -> {self.tRet}'
 
 
 # **********************************************************************************************************************
@@ -274,10 +280,10 @@ class Overload:
             else:
                 # DOES_NOT_UNDERSTAND - too many matches at the smallest distance
                 with context(showFullType=True):
-                    caller = _ppFn(self.name, callerSig)
+                    caller = _ppCall(self.name, callerSig)
                     context.EE(f'1. {caller} fitsWithin:')
                     for fn, tByT, distance, argDistances in matches:
-                        callee = f'{_ppFn(fn.name, fn.sig)}) (argDistances: {argDistances}) - {fn.fullname} defined in {fn.modname}'
+                        callee = f'{fn.ppSig()}) (argDistances: {argDistances}) - {fn.fullname} defined in {fn.modname}'
                         context.EE(f'  {callee}')
                 raiseLess(TypeError(f'Found {len(matches)} matches and {len(fallbacks)} fallbacks for {caller}', ErrSite("#2")))
         elif len(fallbacks) == 1:
@@ -290,26 +296,26 @@ class Overload:
             else:
                 # DOES_NOT_UNDERSTAND - too many fallbacks at the smallest distance
                 with context(showFullType=True):
-                    caller = _ppFn(self.name, callerSig)
+                    caller = _ppCall(self.name, callerSig)
                     context.EE(f'2. {caller} fitsWithin:')
                     for fn, tByT, distance, argDistances in matches:
-                        callee = f'{_ppFn(fn.name, fn.sig)}) (argDistances: {argDistances}) - {fn.fullname} defined in {fn.modname}'
+                        callee = f'{fn.ppSig()}) (argDistances: {argDistances}) - {fn.fullname} defined in {fn.modname}'
                         context.EE(f'  {callee}')
                 raiseLess(TypeError(f'Found {len(matches)} matches and {len(fallbacks)} fallbacks for {caller}', ErrSite("#3")))
         else:
             # DOES_NOT_UNDERSTAND - no matches or fallbacks
             with context(showFullType=True):
-                caller = _ppFn(self.name, callerSig)
+                caller = _ppCall(self.name, callerSig)
                 context.EE(f'No matches for {caller} in:')
                 for sig, fn in self._tvfuncBySig.items():
-                    callee = f'{_ppFn(fn.name, sig)}) - {fn.fullname} defined in {fn.modname}'
+                    callee = f'{fn.ppSig()} - {fn.fullname} defined in {fn.modname}'
                     context.EE(f'  {callee}')
             raiseLess(BTypeError(f'No matches for {caller}'), ErrSite("#1"))
 
 
 def _distancesEtAl(callerSig, fnSig):
-    if len(callerSig) == 2 and len(fnSig) == 2 and callerSig[0].id == 108 and callerSig[1].id == 106 and fnSig[0].id == 108 and fnSig[1].id == 106:
-        pass
+    # if len(callerSig) == 2 and len(fnSig) == 2 and callerSig[0].id == 108 and callerSig[1].id == 106 and fnSig[0].id == 108 and fnSig[1].id == 106:
+    #     pass
     fallback = False
     match = True
     argDistances = []
@@ -484,11 +490,8 @@ def ppSig(x):
         retT = _ppType(x.tRet)
         return f'({",".join(argTs)})->{retT} <{x.style.name}>  :   in {x.fullname}'
 
-def _ppFn(name, sig, argNames=Missing):
-    if argNames is Missing:
-        return f'{name}({",".join([_ppType(t) for t in sig])})'
-    else:
-        return f'{name}({",".join([f"{n}:{_ppType(t)}" for t, n in zip(sig, argNames)])})'
+def _ppCall(name, sig):
+    return f'{name}({",".join([_ppType(t) for t in sig])})'
 
 def _ppType(t):
     if type(t) is type:
