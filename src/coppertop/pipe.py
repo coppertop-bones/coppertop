@@ -73,7 +73,7 @@ from bones.core.errors import ErrSite, CPTBError, NotYetImplemented
 from bones.core.sentinels import Missing
 from bones.core.utils import raiseLess
 from bones.ts.metatypes import BType, fitsWithin as origFitsWithin, BTFn, BTTuple, BTAtom, _btypeByClass
-from bones.lang.types import nullary, unary, binary, ternary, _tvfunc, btype
+from bones.lang.types import nullary, unary, binary, ternary, _tvfunc, btype, pytype
 from bones.ts.select import Family, ppSig
 
 
@@ -371,7 +371,7 @@ def _importFromBonesModule(frombmodName, frombmod, tobmodname, tobmod, importers
             thingsToImport[n] = addition
         elif pymodJf is Missing:
             if not isinstance(addition, (jones._fn, jones._pfn)) and not isinstance(addition, BType):
-                raise CoppertopImportError(f'Trying to import "{n}" which is a {type(addition)}')
+                raise CoppertopImportError(f'Trying to import "{n}" which is a {builtins.type(addition)}')
             if current is Missing:
                 tobmod.__dict__[n] = addition.__class__(n, tobmodname, Family(addition.d), _UNDERSCORE)
             else:
@@ -391,7 +391,7 @@ def _importFromBonesModule(frombmodName, frombmod, tobmodname, tobmod, importers
             elif isinstance(addition, BType):
                 raise NotYetImplemented("overloading type and jonesFn")
             else:
-                raise CoppertopImportError(f'Trying to import "{n}", which is a {type(addition)} to overwrite a {type(current)}!!!')
+                raise CoppertopImportError(f'Trying to import "{n}", which is a {builtins.type(addition)} to overwrite a {builtins.type(current)}!!!')
         elif isinstance(current, BType):
             if isinstance(addition, (jones._fn, jones._pfn)):
                 raise NotYetImplemented("overloading type and jonesFn")
@@ -399,7 +399,7 @@ def _importFromBonesModule(frombmodName, frombmod, tobmodname, tobmod, importers
                 # no need to import anything but just check they are the same
                 if current._id != addition._id: raise CoppertopImportError(f"Type {n} is different in {frombmodName}")
             else:
-                raise CoppertopImportError(f'Trying to import "{n}", which is a {type(addition)} to overwrite a {type(current)}!!!')
+                raise CoppertopImportError(f'Trying to import "{n}", which is a {builtins.type(addition)} to overwrite a {builtins.type(current)}!!!')
         else:
             raise CoppertopImportError(f'"{n}" is not a jones function nor a jones type')
 
@@ -474,11 +474,11 @@ def sig(x):
     return ppSig(x)
 
 @coppertop(dispatchEvenIfAllTypes=True)
-def type(x):
+def type(x) -> pytype:
     return builtins.type(x)
 
 @coppertop(dispatchEvenIfAllTypes=True)
-def typeOf(x) -> btype:
+def typeOf(x) -> btype + pytype:
     return sys._typeOf(x)
 
 

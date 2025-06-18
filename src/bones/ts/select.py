@@ -10,14 +10,14 @@
 import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
-import collections, builtins
+import collections
 
 from bones import jones
 from bones.core.context import context
 from bones.core.sentinels import Missing, function
 from bones.core.errors import ProgrammerError, ErrSite, NotYetImplemented
 from bones.ts.metatypes import updateSchemaVarsWith, fitsWithin, BTFamily, BType, _btypeByClass, _BTypeById, BTUnion, \
-    BTFn, BTAtom, BTTuple, btype, TBI
+    BTFn, BTTuple, btype, pytype, TBI
 from bones.ts.core import SchemaError, BTypeError
 from bones.core.utils import raiseLess, firstValue
 
@@ -456,7 +456,7 @@ class Family:
 # Utilities
 # **********************************************************************************************************************
 
-def _typeOf(x):
+def _typeOf(x) -> pytype + btype:
     if hasattr(x, '_t'):
         return x._t                     # it's a tv of some sort so return the t
     elif isinstance(x, jones._fn):
@@ -466,9 +466,9 @@ def _typeOf(x):
     elif isinstance(x, BType):
         return btype
     else:
-        t = builtins.type(x)
+        t = type(x)
         if t is _CoWProxy:
-            t = builtins.type(x._target)         # return the type of thing being proxied
+            t = type(x._target)         # return the type of thing being proxied
         return _btypeByClass.get(t, t)       # type python types as their bones equivalent
 
 sys._typeOf = _typeOf               # required by coercion - do not remove

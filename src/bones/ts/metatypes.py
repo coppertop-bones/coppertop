@@ -201,7 +201,11 @@ def fitsWithin(a, b, *, fittingSigs=False):
     if isinstance(a, type):
         if isinstance(b, BType):
             # most fitsWithin calls in coppertop will be Python type <: BType so this is the first case
-            cacheId = (a, b.id)
+            if b == pytype:
+                # any Python type <: pytype
+                return Fits(True, {}, 0)
+            else:
+                cacheId = (a, b.id)
         elif isinstance(b, type):
             return IDENTICAL if a == b else DOES_NOT_FIT     # can Python's typing stuff be used here?
         else:
@@ -626,6 +630,8 @@ def _THasTOther(t, acc):
         acc['otherHasT'] = acc['otherHasT'] or hasT(t)
     return acc
 
+
+_implicitTypes = ()
 def _anyNotImplicit(ts):
     for t in ts:
         if t not in _implicitTypes:
@@ -824,6 +830,25 @@ def hasT(t):
         raise ProgrammerError()
 
 
+def isT(x):
+    return isinstance(x, BTSchemaVariable) and x.hasT  # mildly faster than x.base is T
+
+
+def determineRetType(md, schemaVars, sigCaller):
+    raise NotYetImplemented()
+
+
+def _find(needle, haystack):
+    try:
+        return haystack.index(needle)
+    except:
+        return -1
+
+
+# **********************************************************************************************************************
+# essential btypes used throughout coppertop-bones
+# **********************************************************************************************************************
+
 T = BTSchemaVariable("T")
 
 _schemaVariablesByOrd = [Missing]
@@ -836,15 +861,9 @@ def schemaVariableForOrd(ord):
             _schemaVariablesByOrd[i] = BTSchemaVariable(f'T{i}')
     return _schemaVariablesByOrd[ord]
 
-
-def isT(x):
-    return isinstance(x, BTSchemaVariable) and x.hasT  # mildly faster than x.base is T
-
-
 for i in range(1, 10):
     Ti = schemaVariableForOrd(i)
     locals()[Ti.name] = Ti
-
 
 N = BTAtom('N')
 _ordinalTypes = [N]
@@ -854,21 +873,10 @@ for i in range(1, 10):
     _ordinalTypes.append(Ni)
     locals()[Ni.name] = Ni
 
-
 BType._arrayOrdinalTypes = tuple(_ordinalTypes)
 
-
-_implicitTypes = ()
-
-def _find(needle, haystack):
-    try:
-        return haystack.index(needle)
-    except:
-        return -1
-
-def determineRetType(md, schemaVars, sigCaller):
-    raise NotYetImplemented()
-
-
-btype = BType('btype: atom in mem')
+btype = BType('btype: atom in mem')     # a BType - OPEN: define in jones?
+pytype = BType('pytype: atom in mem')   # a Python type
 TBI = BType('TBI: atom in mem')         # To Be Inferred - OPEN: define in jones
+
+_btypeByClass[builtins.type] = pytype   # needed to build @coppertop functions in coppertop.pipe which imports this module
