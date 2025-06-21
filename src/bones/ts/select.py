@@ -30,8 +30,12 @@ DISABLE_RETURN_CHECK = False
 DISABLE_ARG_CHECK_FOR_SOLE_FN = False
 SHOW_ARGNAMES = True
 
-SelectionResult = collections.namedtuple('SelectionResult', ['tvfunc', 'tByT'])
+SelectionResult = collections.namedtuple('SelectionResult', ['tvfunc', 'tByT'])     # OPEN: move to C
 
+
+# OPEN: small to moderate effort - implement the function/overload/family call in C so the user doesn't have to step
+# into the dispatch logic when debugging in an IDE but just goes straight to the implementation in question. Breakpoints
+# can still be added for callback implemented in Python such as fitsWithin, chooseNearest and error handling
 
 
 # **********************************************************************************************************************
@@ -62,24 +66,27 @@ class _tvfunc:
         self.__doc__ = _v.__doc__ if hasattr(_v, '__doc__') else None
 
     def __call__(self, *args, schemaVars=Missing):
+        # OPEN: implement in C
         try:
             if self.pass_tByT:
                 if schemaVars is Missing:
                     match, fallback, schemaVars, argDistances = _distancesEtAl([_typeOf(arg) for arg in args], self.sig)
                 if self.typeHelper:
-                    tByT = self.typeHelper(*args, tByT=schemaVars)
+                    tByT = self.typeHelper(*args, tByT=schemaVars)  # OPEN: callback into typeHelper
                 ret = self._v(*args, tByT=schemaVars)
             else:
                 ret = self._v(*args)
         except TypeError as ex:
-            # instead of TypeError: createBag() missing 1 required positional argument: 'otherHandSizesById'
-            # print out the signature and provided args
+            # OPEN: callback into error helper #1
             if ex.args and ' required positional argument' in ex.args[0]:
+                # instead of TypeError: createBag() missing 1 required positional argument: 'otherHandSizesById'
+                # print out the signature and provided args
                 print(ppSig(self), file=sys.stderr)
                 print(ex.args[0], file=sys.stderr)
             raiseLess(ex, True)
 
-        if DISABLE_RETURN_CHECK:
+        if DISABLE_RETURN_CHECK:    # DISABLE_RETURN_CHECK should be a flag on the function/overload/family itself so
+                                    # tight loops can disable it
             return ret
         else:
             tRet = self.tRet
@@ -92,14 +99,15 @@ class _tvfunc:
                 if hasattr(ret, '_t'):
                     if ret._t:
                         # check the actual return type fits the declared return type
-                        if fitsWithin(ret._t, tRet):
+                        if fitsWithin(ret._t, tRet):    # OPEN: call back into fitsWithin
                             return ret
                         else:
+                            # OPEN: callback into error helper #2
                             raiseLess(BTypeError(f'{self.fullname} returned a {str(_typeOf(ret))} should have have returned a {tRet} {tByT}',ErrSite("#1")))
                     else:
                         return ret | tRet
                 else:
-                    if fitsWithin(_typeOf(ret), tRet):
+                    if fitsWithin(_typeOf(ret), tRet):      # OPEN: call back into fitsWithin
                         return ret
                     else:
                         # use the coercer rather than impose construction with tv
@@ -213,6 +221,7 @@ class Overload:
         return f'{answer} ({ppT})'
 
     def __call__(self, *args):
+        # OPEN: implement in C
         if DISABLE_ARG_CHECK_FOR_SOLE_FN and len(self._tvfuncBySig) == 1:
             return firstValue(self._tvfuncBySig)(*args)
         tvfunc, schemaVars, hasValue = self.selectFunction(*args)
@@ -222,6 +231,7 @@ class Overload:
             return SelectionResult(tvfunc, schemaVars)
 
     def selectFunction(self, *args):
+        # OPEN: implement in C
         if self.numargs == 0:
             tvfunc = self._tvfuncBySig[()]
             tByT = {}
@@ -254,6 +264,7 @@ class Overload:
         return tvfunc, tByT, hasValue
 
     def _selectFunction(self, callerSig):
+        # OPEN: implement this section in C
         fallbacks, matches = [], []
         # search though each function in _tvfuncBySig recording catchAll matches separately from actual matches
         distance = 10000
@@ -261,15 +272,19 @@ class Overload:
             distance = 10000
             match, fallback, schemaVars, argDistances = _distancesEtAl(callerSig, fnSig)
             if match:
-                distance = sum(argDistances)        # effective L1, could do L2 or something else but needs to be easy to understand and intuit
+                distance = sum(argDistances)
                 if fallback:
                     fallbacks.append((fn, schemaVars, distance, argDistances))
                 else:
                     matches.append((fn, schemaVars, distance, argDistances))
             if distance == 0:
-                # OPEN: instead of escaping at first match complete the search and warn of potential conflicts (i.e. fns that have the same distance to the signature)
+                # OPEN: instead of escaping at first match complete the search and provide and early warning of
+                # potential conflicts (i.e. fns that have the same distance to the signature)
                 return fn, schemaVars, distance, argDistances
 
+        # OPEN: implement the distance metric based selection in C but allow a Python callback since the distance
+        # metric is not yet community proven and may change, e.g. sum(argDistances) is effectively L1, could do L2 or
+        # something else but it must feel intuitive and be easy to understand
         if len(matches) == 1:
             return matches[0]
         elif len(matches) > 1:
@@ -314,6 +329,7 @@ class Overload:
 
 
 def _distancesEtAl(callerSig, fnSig):
+    # OPEN: implement this in C
     # if len(callerSig) == 2 and len(fnSig) == 2 and callerSig[0].id == 108 and callerSig[1].id == 106 and fnSig[0].id == 108 and fnSig[1].id == 106:
     #     pass
     fallback = False
@@ -412,6 +428,7 @@ class Family:
 
 
     def __call__(self, *args):
+        # OPEN: implement in C
         if (numArgs := len(args)) > len(self._overloadByNumArgs) - 1:
             raise TypeError(f"Too many args passed to  {self.name} - max {len(self._overloadByNumArgs) - 1}, passed {numArgs}")
         return self._overloadByNumArgs[numArgs](*args)
@@ -423,7 +440,7 @@ class Family:
         return self._overloadByNumArgs[numargs]
 
     def _tPartial(self, num_args, o_tbc):
-        # if this is a bottleneck can be cached
+        # if this is a bottleneck cache it with an invalidation mechanism if an underlying overload changes
         ts = []
         for sig, tvfunc in self._overloadByNumArgs[num_args].items():
             ts.append(tvfunc._tPartial(o_tbc))
