@@ -30,8 +30,6 @@ DISABLE_RETURN_CHECK = False
 DISABLE_ARG_CHECK_FOR_SOLE_FN = False
 SHOW_ARGNAMES = True
 
-SelectionResult = collections.namedtuple('SelectionResult', ['tvfunc', 'tByT'])     # OPEN: move to C
-
 
 # OPEN: small to moderate effort - implement the function/overload/family call in C so the user doesn't have to step
 # into the dispatch logic when debugging in an IDE but just goes straight to the implementation in question. Breakpoints
@@ -42,11 +40,41 @@ SelectionResult = collections.namedtuple('SelectionResult', ['tvfunc', 'tByT']) 
 # function struct
 # **********************************************************************************************************************
 
+
+class DummyDb():
+    def disable_tracing(self):
+        pass
+    def enable_tracing(self):
+        pass
+
+def getDb():
+    if (oldTrace := sys.gettrace()):
+        if hasattr(oldTrace, '_args'):
+            return oldTrace._args[0]
+    return DummyDb()
+
+import threading
+def _traceNone(frame, event, arg):
+    return _traceNone
+
+class Fred():
+    def __init__(self):
+        self.sysTrace = sys.gettrace()
+        self.threadingTrace = threading.gettrace()
+    def disable_tracing(self):
+        sys.settrace(_traceNone)
+        threading.settrace(_traceNone)
+    def enable_tracing(self):
+        sys.settrace(self.sysTrace)
+        threading.settrace(self.threadingTrace)
+
+
+
 class _tvfunc:
 
     __slots__ = [
-        'style', 'name', '_t', 'modname', '_v', 'argNames', 'sig', 'tArgs', 'tRet',
-        'pass_tByT', 'dispatchEvenIfAllTypes', 'typeHelper', '__doc__'
+        'style', 'name', '_t', 'modname', '_v', 'argNames', 'sig', 'tArgs', 'tRet', 'pass_tByT',
+        'dispatchEvenIfAllTypes', 'typeHelper', '__doc__', '_errorCallback1', '_errorCallback2', '_disableReturnCheck'
      ]
 
     def __init__(self, *, name, modname, style, _v, dispatchEvenIfAllTypes, typeHelper, _t, argNames, pass_tByT):
@@ -64,33 +92,44 @@ class _tvfunc:
         self.dispatchEvenIfAllTypes = dispatchEvenIfAllTypes          # calls the function rather returning a SelectionResult when all args are types
         self.typeHelper = typeHelper
         self.__doc__ = _v.__doc__ if hasattr(_v, '__doc__') else None
+        self._errorCallback1 = _errorCallback1              # OPEN: add as module variable in the C module
+        self._errorCallback2 = _errorCallback2              # ditto
+        self._disableReturnCheck = DISABLE_RETURN_CHECK
 
     def __call__(self, *args, schemaVars=Missing):
-        # OPEN: implement in C
+        # OPEN: implement in C - needs access to:
+        # - Missing
+        # - _typeOf
+        # - _distancesEtAl (needs doing in C)
+        # - errorCallback1?
+        # - errorCallback2?
+        # - fitsWithin (needs doing in C)
+        db = getDb()
+        db.disable_tracing()
         try:
             if self.pass_tByT:
                 if schemaVars is Missing:
                     match, fallback, schemaVars, argDistances = _distancesEtAl([_typeOf(arg) for arg in args], self.sig)
                 if self.typeHelper:
                     tByT = self.typeHelper(*args, tByT=schemaVars)  # OPEN: callback into typeHelper
+                db.enable_tracing()
                 ret = self._v(*args, tByT=schemaVars)
+                db.disable_tracing()
             else:
+                db.enable_tracing()
                 ret = self._v(*args)
+                db.disable_tracing()
         except TypeError as ex:
-            # OPEN: callback into error helper #1
-            if ex.args and ' required positional argument' in ex.args[0]:
-                # instead of TypeError: createBag() missing 1 required positional argument: 'otherHandSizesById'
-                # print out the signature and provided args
-                print(ppSig(self), file=sys.stderr)
-                print(ex.args[0], file=sys.stderr)
-            raiseLess(ex, True)
+            db.enable_tracing()
+            self._errorCallback1(ex, self)
 
-        if DISABLE_RETURN_CHECK:    # DISABLE_RETURN_CHECK should be a flag on the function/overload/family itself so
-                                    # tight loops can disable it
+        if self._disableReturnCheck:
+            db.enable_tracing()
             return ret
         else:
             tRet = self.tRet
-            if tRet == py or isinstance(ret, SelectionResult):
+            if tRet == py or isinstance(ret, jones.SelectionResult):
+                db.enable_tracing()
                 return ret
             else:
                 # OPEN: BTTuples are products whereas pytuples are exponentials therefore we can reliably type check
@@ -100,18 +139,24 @@ class _tvfunc:
                     if ret._t:
                         # check the actual return type fits the declared return type
                         if fitsWithin(ret._t, tRet):    # OPEN: call back into fitsWithin
+                            db.enable_tracing()
                             return ret
                         else:
-                            # OPEN: callback into error helper #2
-                            raiseLess(BTypeError(f'{self.fullname} returned a {str(_typeOf(ret))} should have have returned a {tRet} {tByT}',ErrSite("#1")))
+                            db.enable_tracing()
+                            self._errorCallback2(self, ret)
                     else:
-                        return ret | tRet
+                        ret = ret | tRet
+                        db.enable_tracing()
+                        return ret
                 else:
                     if fitsWithin(_typeOf(ret), tRet):      # OPEN: call back into fitsWithin
+                        db.enable_tracing()
                         return ret
                     else:
                         # use the coercer rather than impose construction with tv
-                        return ret | tRet
+                        ret = ret | tRet
+                        db.enable_tracing()
+                        return ret
 
     @property
     def fullname(self):
@@ -134,20 +179,36 @@ class _tvfunc:
             return f'{self.name}({",".join([f"{n}:{_ppType(t)}" for t, n in zip(self.sig, self.argNames)])}) -> {self.tRet}'
 
 
+def _errorCallback1(ex, tvfunc):
+    if ex.args and ' required positional argument' in ex.args[0]:
+        # instead of TypeError: createBag() missing 1 required positional argument: 'otherHandSizesById'
+        # print out the signature and provided args
+        print(ppSig(tvfunc), file=sys.stderr)
+        print(ex.args[0], file=sys.stderr)
+    raiseLess(ex, True)
+
+def _errorCallback2(tvfunc, ret):
+    raiseLess(BTypeError(
+        f'{tvfunc.fullname} returned a {str(_typeOf(ret))} should have have returned a {tvfunc.tRet} {tvfunc.tByT}',
+        ErrSite("#1")
+    ))
+
+
 # **********************************************************************************************************************
 # Overload
 # **********************************************************************************************************************
 
-class Overload:
+class Overload(jones.JOverload):
     # limited dictionary style interface object that stores tvfunc by sig for a given name and number of args
 
-    __slots__ = ['name', 'numargs', '_fnsTBI', '_t_', '_tUpperBounds_', '_tvfuncBySig', 'cache']
+    __slots__ = ['_fnsTBI', '_t_', '_tUpperBounds_', 'cache']
 
     @classmethod
     def newForMutation(cls, name, numargs):
         instance = super().__new__(cls)
         instance.name = name
         instance.numargs = numargs
+        instance._selectFunctionCallback = instance.selectFunction
         instance._fnsTBI = _TBIQueue()
         instance._t_ = Missing
         instance._tUpperBounds_ = Missing           # set else where
@@ -196,39 +257,46 @@ class Overload:
 
     def __repr__(self):
         answer = f'{self.name}_{self.numargs}'
-        ppT = ''
-        try:
-            ppT = repr(self._t)
-        except:
-            1/0
+        if not self._tvfuncBySig:
+            if self._fnsTBI:
+                ppT = 'empty with TBIs'
+            else:
+                ppT = 'empty'
+        else:
             try:
-                tArgs = []
-                tRets = []
-                # collate the types for each arg
-                for i in range(self.numargs):
-                    tArgsN = []
-                    for tvfunc in self._fnsTBI:
-                        tArgsN.append(tvfunc.tArgs.types[i])
-                    tArgs.append(BTUnion(*tArgsN) if len(tArgsN) != 1 else tArgsN[0])
-                # collate the tRets
-                for tvfunc in self._fnsTBI:
-                    tRets.append(tvfunc.tRet)
-                tRet = BTUnion(*tRets) if len(tRets) > 1 else tRets[0]
-                ppT = repr(BTFn(tArgs, tRet))
+                ppT = ''
+                ppT = repr(self._t)
             except:
-                ppT = 'Error calc _tUpper'
+                ppT = '???'
+                try:
+                    tArgs = []
+                    tRets = []
+                    # collate the types for each arg
+                    for i in range(self.numargs):
+                        tArgsN = []
+                        for tvfunc in self._fnsTBI:
+                            tArgsN.append(tvfunc.tArgs.types[i])
+                        tArgs.append(BTUnion(*tArgsN) if len(tArgsN) != 1 else tArgsN[0])
+                    # collate the tRets
+                    for tvfunc in self._fnsTBI:
+                        tRets.append(tvfunc.tRet)
+                    tRet = BTUnion(*tRets) if len(tRets) > 1 else tRets[0]
+                    ppT = repr(BTFn(tArgs, tRet))
+                except:
+                    ppT = 'Error calc _tUpper'
 
         return f'{answer} ({ppT})'
 
     def __call__(self, *args):
         # OPEN: implement in C
         if DISABLE_ARG_CHECK_FOR_SOLE_FN and len(self._tvfuncBySig) == 1:
-            return firstValue(self._tvfuncBySig)(*args)
+            tvfunc = firstValue(self._tvfuncBySig)
+            return tvfunc(*args)
         tvfunc, schemaVars, hasValue = self.selectFunction(*args)
         if hasValue or tvfunc.dispatchEvenIfAllTypes:
             return tvfunc(*args, schemaVars=schemaVars)
         else:
-            return SelectionResult(tvfunc, schemaVars)
+            return jones.SelectionResult(tvfunc, schemaVars)
 
     def selectFunction(self, *args):
         # OPEN: implement in C
@@ -332,8 +400,8 @@ def _distancesEtAl(callerSig, fnSig):
     # OPEN: implement this in C
     # if len(callerSig) == 2 and len(fnSig) == 2 and callerSig[0].id == 108 and callerSig[1].id == 106 and fnSig[0].id == 108 and fnSig[1].id == 106:
     #     pass
-    fallback = False
     match = True
+    fallback = False
     argDistances = []
     schemaVars = {}
     for tArg, tFnArg in zip(callerSig, fnSig):
@@ -359,9 +427,9 @@ def _distancesEtAl(callerSig, fnSig):
 # Family
 # **********************************************************************************************************************
 
-class Family:
+class Family(jones.JFamily):
 
-    __slots__ = ['style', 'name', '_t', '_overloadByNumArgs', '_doc']
+    __slots__ = ['style', '_t', '_doc']
 
     # we provide two construction interfaces - one used by the parser to create a new family for a function that can
     # hold just a single function and the other used coppertop to create which is the intersection of two or more
@@ -370,10 +438,10 @@ class Family:
     @classmethod
     def newForMutation(cls, *, name, style=Missing):
         instance = super().__new__(cls)
+        instance._overloadByNumArgs = []
         instance.name = name
         instance.style = style
         instance._t = Missing
-        instance._overloadByNumArgs = []
         instance._doc = Missing
         return instance
 
@@ -427,11 +495,8 @@ class Family:
         return instance
 
 
-    def __call__(self, *args):
-        # OPEN: implement in C
-        if (numArgs := len(args)) > len(self._overloadByNumArgs) - 1:
-            raise TypeError(f"Too many args passed to  {self.name} - max {len(self._overloadByNumArgs) - 1}, passed {numArgs}")
-        return self._overloadByNumArgs[numArgs](*args)
+    # def __call__(self, *args):
+    #     implemented in C
 
 
     def getOverload(self, numargs):
@@ -447,7 +512,7 @@ class Family:
         return BTFamily(*ts)
 
     def __repr__(self):
-        return self.name
+        return f'{self.name} Family'
 
     @property
     def __doc__(self):
