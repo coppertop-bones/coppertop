@@ -93,7 +93,8 @@ class _tvfunc(jones.JFunc):
         self.sig = _t.tArgs.types
         self.pass_tByT = pass_tByT
         self.dispatchEvenIfAllTypes = dispatchEvenIfAllTypes          # calls the function rather returning a SelectionResult when all args are types
-        self.typeHelper = typeHelper
+        if typeHelper:
+            self.typeHelper = typeHelper
         self.__doc__ = _v.__doc__ if hasattr(_v, '__doc__') else None
 
     # def __call__(self, *args):
@@ -146,21 +147,6 @@ class _tvfunc(jones.JFunc):
             return f'{self.name}({",".join([_ppType(t) for t in self.sig])}) -> {self.tRet}'
         else:
             return f'{self.name}({",".join([f"{n}:{_ppType(t)}" for t, n in zip(self.sig, self.argNames)])}) -> {self.tRet}'
-
-
-def _tvfuncErrorCallback1(ex, tvfunc):
-    if ex.args and ' required positional argument' in ex.args[0]:
-        # instead of TypeError: createBag() missing 1 required positional argument: 'otherHandSizesById'
-        # print out the signature and provided args
-        print(ppSig(tvfunc), file=sys.stderr)
-        print(ex.args[0], file=sys.stderr)
-    raiseLess(ex, True)
-
-def _tvfuncErrorCallback2(tvfunc, ret):
-    raiseLess(BTypeError(
-        f'{tvfunc.fullname} returned a {str(_typeOf(ret))} should have have returned a {tvfunc.tRet} {tvfunc.tByT}',
-        ErrSite("#1")
-    ))
 
 
 # **********************************************************************************************************************
@@ -357,32 +343,6 @@ class Overload(jones.JOverload):
             raiseLess(BTypeError(f'No matches for {caller}'), ErrSite("#1"))
 
 
-def _distancesEtAl(callerSig, fnSig):
-    # OPEN: implement this in C
-    # if len(callerSig) == 2 and len(fnSig) == 2 and callerSig[0].id == 108 and callerSig[1].id == 106 and fnSig[0].id == 108 and fnSig[1].id == 106:
-    #     pass
-    match = True
-    fallback = False
-    argDistances = []
-    schemaVars = {}
-    for tArg, tFnArg in zip(callerSig, fnSig):
-        if tFnArg == py:
-            fallback = True
-            argDistances.append(0.5)
-        else:
-            fits = fitsWithin(tArg, tFnArg)
-            if not fits:
-                match = False
-                break
-            try:
-                schemaVars, argDistance = updateSchemaVarsWith(schemaVars, 0, fits)
-            except SchemaError:
-                match = False
-                break
-            argDistances.append(argDistance)
-    return match, fallback, schemaVars, argDistances
-
-
 
 # **********************************************************************************************************************
 # Family
@@ -497,21 +457,6 @@ class Family(jones.JFamily):
 # Utilities
 # **********************************************************************************************************************
 
-def _typeOf(x) -> pytype + btype:
-    if hasattr(x, '_t'):
-        return x._t                         # it's a tv of some sort so return the t
-    elif isinstance(x, jones._fn):
-        return x.d._t
-    elif isinstance(x, jones._pfn):
-        return x.d._tPartial(x.num_args, x.o_tbc)
-    elif isinstance(x, BType):
-        return btype
-    else:
-        t = builtins.type(x)
-        if t is _CoWProxy:
-            t = builtins.type(x._target)    # return the type of thing being proxied
-        return _btypeByClass.get(t, t)      # type python types as their bones equivalent
-
 def ppSig(x):
     if isinstance(x, function):
         return f'{x.__name__} is a Python function'
@@ -555,6 +500,63 @@ class _TBIQueue:
     #     return self._fns[0]
     def __iter__(self):
         return iter(self._fns)
+
+def _typeOf(x) -> pytype + btype:
+    if hasattr(x, '_t'):
+        return x._t                         # it's a tv of some sort so return the t
+    elif isinstance(x, jones._fn):
+        return x.d._t
+    elif isinstance(x, jones._pfn):
+        return x.d._tPartial(x.num_args, x.o_tbc)
+    elif isinstance(x, BType):
+        return btype
+    else:
+        t = builtins.type(x)
+        if t is _CoWProxy:
+            t = builtins.type(x._target)    # return the type of thing being proxied
+        return _btypeByClass.get(t, t)      # type python types as their bones equivalent
+
+def _tvfuncErrorCallback1(ex, tvfunc):
+    if ex.args and ' required positional argument' in ex.args[0]:
+        # instead of TypeError: createBag() missing 1 required positional argument: 'otherHandSizesById'
+        # print out the signature and provided args
+        print(ppSig(tvfunc), file=sys.stderr)
+        print(ex.args[0], file=sys.stderr)
+    # raise ex from ex
+    # raiseLess(ex, True)
+
+def _tvfuncErrorCallback2(tvfunc, ret):
+    raiseLess(BTypeError(
+        f'{tvfunc.fullname} returned a {str(_typeOf(ret))} should have have returned a {tvfunc.tRet} {tvfunc.tByT}',
+        ErrSite("#1")
+    ))
+
+def _distancesEtAl(callerSig, fnSig):
+    # OPEN: implement this in C
+    # if len(callerSig) == 2 and len(fnSig) == 2 and callerSig[0].id == 108 and callerSig[1].id == 106 and fnSig[0].id == 108 and fnSig[1].id == 106:
+    #     pass
+    match = True
+    fallback = False
+    argDistances = []
+    schemaVars = {}
+    for tArg, tFnArg in zip(callerSig, fnSig):
+        if tFnArg == py:
+            fallback = True
+            argDistances.append(0.5)
+        else:
+            fits = fitsWithin(tArg, tFnArg)
+            if not fits:
+                match = False
+                break
+            try:
+                schemaVars, argDistance = updateSchemaVarsWith(schemaVars, 0, fits)
+            except SchemaError:
+                match = False
+                break
+            argDistances.append(argDistance)
+    return match, fallback, schemaVars, argDistances
+
+
 
 
 sys._typeOf = _typeOf               # required by other modules - do not remove, OPEN: add jones.typeOf to use instead
