@@ -10,7 +10,7 @@
 import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
-import collections
+import builtins
 
 from bones import jones
 from bones.core.context import context
@@ -70,12 +70,15 @@ class Fred():
 
 
 
+
 class _tvfunc:
 
     __slots__ = [
         'style', 'name', '_t', 'modname', '_v', 'argNames', 'sig', 'tArgs', 'tRet', 'pass_tByT',
-        'dispatchEvenIfAllTypes', 'typeHelper', '__doc__', '_errorCallback1', '_errorCallback2', '_disableReturnCheck'
+        'dispatchEvenIfAllTypes', 'typeHelper', '__doc__'
      ]
+
+class _tvfunc(jones.JFunc):
 
     def __init__(self, *, name, modname, style, _v, dispatchEvenIfAllTypes, typeHelper, _t, argNames, pass_tByT):
         if not isinstance(_t, BTFn): raise TypeError('_t is not a BTFn')
@@ -92,71 +95,37 @@ class _tvfunc:
         self.dispatchEvenIfAllTypes = dispatchEvenIfAllTypes          # calls the function rather returning a SelectionResult when all args are types
         self.typeHelper = typeHelper
         self.__doc__ = _v.__doc__ if hasattr(_v, '__doc__') else None
-        self._errorCallback1 = _errorCallback1              # OPEN: add as module variable in the C module
-        self._errorCallback2 = _errorCallback2              # ditto
-        self._disableReturnCheck = DISABLE_RETURN_CHECK
 
-    def __call__(self, *args, schemaVars=Missing):
-        # OPEN: implement in C - needs access to:
-        # - Missing
-        # - _typeOf
-        # - _distancesEtAl (needs doing in C)
-        # - errorCallback1?
-        # - errorCallback2?
-        # - fitsWithin (needs doing in C)
-        db = getDb()
-        db.disable_tracing()
-        try:
-            if self.pass_tByT:
-                if schemaVars is Missing:
-                    match, fallback, schemaVars, argDistances = _distancesEtAl([_typeOf(arg) for arg in args], self.sig)
-                if self.typeHelper:
-                    tByT = self.typeHelper(*args, tByT=schemaVars)  # OPEN: callback into typeHelper
-                db.enable_tracing()
-                ret = self._v(*args, tByT=schemaVars)
-                db.disable_tracing()
-            else:
-                db.enable_tracing()
-                ret = self._v(*args)
-                db.disable_tracing()
-        except TypeError as ex:
-            db.enable_tracing()
-            self._errorCallback1(ex, self)
+    # def __call__(self, *args):
+    #     implemented in C
 
-        if self._disableReturnCheck:
-            db.enable_tracing()
-            return ret
-        else:
-            tRet = self.tRet
-            if tRet == py or isinstance(ret, jones.SelectionResult):
-                db.enable_tracing()
-                return ret
-            else:
-                # OPEN: BTTuples are products whereas pytuples are exponentials therefore we can reliably type check
-                # an answered sequence if the return type is BTTuple (and possibly BTStruct) - also BTTuple can be
-                # coerced by default to a dseq
-                if hasattr(ret, '_t'):
-                    if ret._t:
-                        # check the actual return type fits the declared return type
-                        if fitsWithin(ret._t, tRet):    # OPEN: call back into fitsWithin
-                            db.enable_tracing()
-                            return ret
-                        else:
-                            db.enable_tracing()
-                            self._errorCallback2(self, ret)
-                    else:
-                        ret = ret | tRet
-                        db.enable_tracing()
-                        return ret
-                else:
-                    if fitsWithin(_typeOf(ret), tRet):      # OPEN: call back into fitsWithin
-                        db.enable_tracing()
-                        return ret
-                    else:
-                        # use the coercer rather than impose construction with tv
-                        ret = ret | tRet
-                        db.enable_tracing()
-                        return ret
+    # def __call__(self, *args, schemaVars=Missing):
+    #     try:
+    #         if self.pass_tByT:
+    #             if schemaVars is Missing:
+    #                 match, fallback, schemaVars, argDistances = _distancesEtAl([_typeOf(arg) for arg in args], self.sig)
+    #             if self.typeHelper:
+    #                 schemaVars = self.typeHelper(*args, tByT=schemaVars)
+    #             ret = self._v(*args, tByT=schemaVars)
+    #         else:
+    #             ret = self._v(*args)
+    #     except TypeError as ex:
+    #         _tvfuncErrorCallback1(ex, self)
+    #
+    #     if DISABLE_RETURN_CHECK:
+    #         return ret
+    #     else:
+    #         tRet = self.tRet
+    #         if tRet == py or isinstance(ret, jones.SelectionResult):
+    #             return ret
+    #         else:
+    #             # OPEN: BTTuples are products whereas pytuples are exponentials therefore we can reliably type check
+    #             # an answered sequence if the return type is BTTuple (and possibly BTStruct) - also BTTuple can be
+    #             # coerced by default to a dseq
+    #             if fitsWithin(_typeOf(ret), tRet):
+    #                 return ret
+    #             else:
+    #                 _tvfuncErrorCallback2(self, ret)
 
     @property
     def fullname(self):
@@ -179,7 +148,7 @@ class _tvfunc:
             return f'{self.name}({",".join([f"{n}:{_ppType(t)}" for t, n in zip(self.sig, self.argNames)])}) -> {self.tRet}'
 
 
-def _errorCallback1(ex, tvfunc):
+def _tvfuncErrorCallback1(ex, tvfunc):
     if ex.args and ' required positional argument' in ex.args[0]:
         # instead of TypeError: createBag() missing 1 required positional argument: 'otherHandSizesById'
         # print out the signature and provided args
@@ -187,7 +156,7 @@ def _errorCallback1(ex, tvfunc):
         print(ex.args[0], file=sys.stderr)
     raiseLess(ex, True)
 
-def _errorCallback2(tvfunc, ret):
+def _tvfuncErrorCallback2(tvfunc, ret):
     raiseLess(BTypeError(
         f'{tvfunc.fullname} returned a {str(_typeOf(ret))} should have have returned a {tvfunc.tRet} {tvfunc.tByT}',
         ErrSite("#1")
@@ -287,16 +256,8 @@ class Overload(jones.JOverload):
 
         return f'{answer} ({ppT})'
 
-    def __call__(self, *args):
-        # OPEN: implement in C
-        if DISABLE_ARG_CHECK_FOR_SOLE_FN and len(self._tvfuncBySig) == 1:
-            tvfunc = firstValue(self._tvfuncBySig)
-            return tvfunc(*args)
-        tvfunc, schemaVars, hasValue = self.selectFunction(*args)
-        if hasValue or tvfunc.dispatchEvenIfAllTypes:
-            return tvfunc(*args, schemaVars=schemaVars)
-        else:
-            return jones.SelectionResult(tvfunc, schemaVars)
+    # def __call__(self, *args):
+    #     implemented in C
 
     def selectFunction(self, *args):
         # OPEN: implement in C
@@ -494,10 +455,8 @@ class Family(jones.JFamily):
         instance._doc = None
         return instance
 
-
     # def __call__(self, *args):
     #     implemented in C
-
 
     def getOverload(self, numargs):
         if numargs >= len(self._overloadByNumArgs):
@@ -540,7 +499,7 @@ class Family(jones.JFamily):
 
 def _typeOf(x) -> pytype + btype:
     if hasattr(x, '_t'):
-        return x._t                     # it's a tv of some sort so return the t
+        return x._t                         # it's a tv of some sort so return the t
     elif isinstance(x, jones._fn):
         return x.d._t
     elif isinstance(x, jones._pfn):
@@ -548,12 +507,10 @@ def _typeOf(x) -> pytype + btype:
     elif isinstance(x, BType):
         return btype
     else:
-        t = type(x)
+        t = builtins.type(x)
         if t is _CoWProxy:
-            t = type(x._target)         # return the type of thing being proxied
-        return _btypeByClass.get(t, t)       # type python types as their bones equivalent
-
-sys._typeOf = _typeOf               # required by coercion - do not remove
+            t = builtins.type(x._target)    # return the type of thing being proxied
+        return _btypeByClass.get(t, t)      # type python types as their bones equivalent
 
 def ppSig(x):
     if isinstance(x, function):
@@ -576,7 +533,7 @@ def _ppCall(name, sig):
     return f'{name}({",".join([_ppType(t) for t in sig])})'
 
 def _ppType(t):
-    if type(t) is type:
+    if builtins.type(t) is type:
         return t.__name__
     else:
         return repr(t)
@@ -599,3 +556,11 @@ class _TBIQueue:
     def __iter__(self):
         return iter(self._fns)
 
+
+sys._typeOf = _typeOf               # required by other modules - do not remove, OPEN: add jones.typeOf to use instead
+
+jones.set_typeOf(_typeOf)
+jones.set_distancesEtAl(_distancesEtAl)
+jones.set_fitsWithin(fitsWithin)
+jones.set_tvfuncErrorCallback1(_tvfuncErrorCallback1)
+jones.set_tvfuncErrorCallback2(_tvfuncErrorCallback2)
