@@ -144,9 +144,9 @@ class _tvfunc(jones.JFunc):
 
     def ppSig(self):
         if SHOW_ARGNAMES:
-            return f'{self.name}({",".join([_ppType(t) for t in self.sig])}) -> {self.tRet}'
+            return f'{self.name}({", ".join([_ppType(t) for t in self.sig])}) -> {self.tRet}'
         else:
-            return f'{self.name}({",".join([f"{n}:{_ppType(t)}" for t, n in zip(self.sig, self.argNames)])}) -> {self.tRet}'
+            return f'{self.name}({", ".join([f"{n}:{_ppType(t)}" for t, n in zip(self.sig, self.argNames)])}) -> {self.tRet}'
 
 
 # **********************************************************************************************************************
@@ -475,7 +475,7 @@ def ppSig(x):
         return f'({",".join(argTs)})->{retT} <{x.style.name}>  :   in {x.fullname}'
 
 def _ppCall(name, sig):
-    return f'{name}({",".join([_ppType(t) for t in sig])})'
+    return f'{name}({", ".join([_ppType(t) for t in sig])})'
 
 def _ppType(t):
     if builtins.type(t) is type:

@@ -144,7 +144,7 @@ class BType(BTypeRoot):
             if (coercer := self._coercer) is Missing:
                 if isinstance(self, BTIntersection):
                     # if we are an intersection type then check if one is in the intersection's types
-                    coercers = {t:t._coercer for t in self.types if t._coercer is not Missing}
+                    coercers = {t:t._coercer for t in self.types if hasattr(t, '_coercer') and t._coercer is not Missing}
                     if len(coercers) == 0:
                         pass
                     elif len(coercers) == 1:
