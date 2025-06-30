@@ -40,44 +40,6 @@ SHOW_ARGNAMES = True
 # function struct
 # **********************************************************************************************************************
 
-
-class DummyDb():
-    def disable_tracing(self):
-        pass
-    def enable_tracing(self):
-        pass
-
-def getDb():
-    if (oldTrace := sys.gettrace()):
-        if hasattr(oldTrace, '_args'):
-            return oldTrace._args[0]
-    return DummyDb()
-
-import threading
-def _traceNone(frame, event, arg):
-    return _traceNone
-
-class Fred():
-    def __init__(self):
-        self.sysTrace = sys.gettrace()
-        self.threadingTrace = threading.gettrace()
-    def disable_tracing(self):
-        sys.settrace(_traceNone)
-        threading.settrace(_traceNone)
-    def enable_tracing(self):
-        sys.settrace(self.sysTrace)
-        threading.settrace(self.threadingTrace)
-
-
-
-
-class _tvfunc:
-
-    __slots__ = [
-        'style', 'name', '_t', 'modname', '_v', 'argNames', 'sig', 'tArgs', 'tRet', 'pass_tByT',
-        'dispatchEvenIfAllTypes', 'typeHelper', '__doc__'
-     ]
-
 class _tvfunc(jones.JFunc):
 
     def __init__(self, *, name, modname, style, _v, dispatchEvenIfAllTypes, typeHelper, _t, argNames, pass_tByT):
@@ -99,34 +61,6 @@ class _tvfunc(jones.JFunc):
 
     # def __call__(self, *args):
     #     implemented in C
-
-    # def __call__(self, *args, schemaVars=Missing):
-    #     try:
-    #         if self.pass_tByT:
-    #             if schemaVars is Missing:
-    #                 match, fallback, schemaVars, argDistances = _distancesEtAl([_typeOf(arg) for arg in args], self.sig)
-    #             if self.typeHelper:
-    #                 schemaVars = self.typeHelper(*args, tByT=schemaVars)
-    #             ret = self._v(*args, tByT=schemaVars)
-    #         else:
-    #             ret = self._v(*args)
-    #     except TypeError as ex:
-    #         _tvfuncErrorCallback1(ex, self)
-    #
-    #     if DISABLE_RETURN_CHECK:
-    #         return ret
-    #     else:
-    #         tRet = self.tRet
-    #         if tRet == py or isinstance(ret, jones.SelectionResult):
-    #             return ret
-    #         else:
-    #             # OPEN: BTTuples are products whereas pytuples are exponentials therefore we can reliably type check
-    #             # an answered sequence if the return type is BTTuple (and possibly BTStruct) - also BTTuple can be
-    #             # coerced by default to a dseq
-    #             if fitsWithin(_typeOf(ret), tRet):
-    #                 return ret
-    #             else:
-    #                 _tvfuncErrorCallback2(self, ret)
 
     @property
     def fullname(self):
@@ -556,7 +490,32 @@ def _distancesEtAl(callerSig, fnSig):
             argDistances.append(argDistance)
     return match, fallback, schemaVars, argDistances
 
+class DummyDb():
+    def disable_tracing(self):
+        pass
+    def enable_tracing(self):
+        pass
 
+def getDb():
+    if (oldTrace := sys.gettrace()):
+        if hasattr(oldTrace, '_args'):
+            return oldTrace._args[0]
+    return DummyDb()
+
+import threading
+def _traceNone(frame, event, arg):
+    return _traceNone
+
+class Fred():
+    def __init__(self):
+        self.sysTrace = sys.gettrace()
+        self.threadingTrace = threading.gettrace()
+    def disable_tracing(self):
+        sys.settrace(_traceNone)
+        threading.settrace(_traceNone)
+    def enable_tracing(self):
+        sys.settrace(self.sysTrace)
+        threading.settrace(self.threadingTrace)
 
 
 sys._typeOf = _typeOf               # required by other modules - do not remove, OPEN: add jones.typeOf to use instead
