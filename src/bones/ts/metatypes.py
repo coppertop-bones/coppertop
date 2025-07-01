@@ -24,12 +24,13 @@ __all__ = ['BType', 'BTypeError', 'SchemaError', 'extractConstructors']
 
 import itertools, builtins, collections, statistics
 
+from bones.jones import Fits, SchemaError
 import bones.ts._type_lang.jones_type_manager
 from bones.ts._type_lang.jones_type_manager import JonesTypeManager, BType, BTAtom, BTIntersection, BTUnion, \
     BTTuple, BTStruct, BTSeq, BTMap, BTFn, BTSchemaVariable, BTFamily, BTypeError, ppT, _btcls_by_bmtid, \
     extractConstructors
 from bones.ts.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, \
-    bmtsvr, bmtnameById, SchemaError
+    bmtsvr, bmtnameById
 from bones.ts._type_lang.jones_type_manager import _btypeByClass, _BTypeById     # used by coppertop.pipe - do not remove
 from bones.ts.type_lang import TypeLangInterpreter
 
@@ -167,21 +168,14 @@ O_O = 9
 SCHEMA_PENALTY = 0.5
 
 
-
 # dm should be independent of coppertop so any types needed in coppertop or bone should be created there
 # dm depends on coppertop which intern depends on bones which depends on jones
 # where do we define py?
 # bones has the function selection which uses py
 
 
-
-Fits = collections.namedtuple('Fits', ['fits', 'tByT', 'distance'])
-Fits.__bool__ = lambda self: self.fits
-
 IDENTICAL = Fits(True, {}, 0)
 DOES_NOT_FIT = Fits(False, Missing, Missing)    # or Fits(False, {}, 100000)?
-
-from bones.jones import BType as _JONES_BTYPE
 
 
 def _BTypeToPyBType(bt):
@@ -203,7 +197,7 @@ def fitsWithin(a, b, *, fittingSigs=False):
             # most fitsWithin calls in coppertop will be Python type <: BType so this is the first case
             if b == pytype:
                 # any Python type <: pytype
-                return Fits(True, {}, 0)
+                return (Fits(True, {}, 0))
             else:
                 cacheId = (a, b.id)
         elif isinstance(b, type):

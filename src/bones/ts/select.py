@@ -20,6 +20,7 @@ from bones.ts.metatypes import updateSchemaVarsWith, fitsWithin, BTFamily, BType
     BTFn, BTTuple, btype, pytype, TBI
 from bones.ts.core import SchemaError, BTypeError
 from bones.core.utils import raiseLess, firstValue
+from bones.ts import metatypes
 
 from coppertop._scopes import _CoWProxy
 
@@ -41,6 +42,7 @@ SHOW_ARGNAMES = True
 # **********************************************************************************************************************
 
 class _tvfunc(jones.JFunc):
+    # __slots__ = []      # don't allow any additional attributes to be added to this class
 
     def __init__(self, *, name, modname, style, _v, dispatchEvenIfAllTypes, typeHelper, _t, argNames, pass_tByT):
         if not isinstance(_t, BTFn): raise TypeError('_t is not a BTFn')
@@ -56,6 +58,7 @@ class _tvfunc(jones.JFunc):
         self.pass_tByT = pass_tByT
         self.dispatchEvenIfAllTypes = dispatchEvenIfAllTypes          # calls the function rather returning a SelectionResult when all args are types
         if typeHelper:
+            # if no typeHelper leave the slot as a null pointer in C
             self.typeHelper = typeHelper
         self.__doc__ = _v.__doc__ if hasattr(_v, '__doc__') else None
 
@@ -108,6 +111,9 @@ class Overload(jones.JOverload):
     def __new__(self):
         # OPEN: maybe provide a constructor that takes two or more tvfuncs
         raise ProgrammerError("Overload cannot be constructed directly - use Overload.newForMutation(...)")
+
+    # def __call__(self, *args):
+    #     implemented in C
 
     @property
     def _t(self):
@@ -176,9 +182,6 @@ class Overload(jones.JOverload):
 
         return f'{answer} ({ppT})'
 
-    # def __call__(self, *args):
-    #     implemented in C
-
     def selectFunction(self, *args):
         # OPEN: implement in C
         if self.numargs == 0:
@@ -219,7 +222,9 @@ class Overload(jones.JOverload):
         distance = 10000
         for fnSig, fn in self._tvfuncBySig.items():
             distance = 10000
-            match, fallback, schemaVars, argDistances = _distancesEtAl(callerSig, fnSig)
+            actual = match, fallback, schemaVars, argDistances = jones._distancesEtAl(callerSig, fnSig)
+            expected = _distancesEtAl(callerSig, fnSig)
+            assert actual == expected, f'{actual} != {expected} for {fnSig} vs {callerSig}'
             if match:
                 distance = sum(argDistances)
                 if fallback:
@@ -466,9 +471,6 @@ def _tvfuncErrorCallback2(tvfunc, ret):
     ))
 
 def _distancesEtAl(callerSig, fnSig):
-    # OPEN: implement this in C
-    # if len(callerSig) == 2 and len(fnSig) == 2 and callerSig[0].id == 108 and callerSig[1].id == 106 and fnSig[0].id == 108 and fnSig[1].id == 106:
-    #     pass
     match = True
     fallback = False
     argDistances = []
@@ -525,3 +527,6 @@ jones.set_distancesEtAl(_distancesEtAl)
 jones.set_fitsWithin(fitsWithin)
 jones.set_tvfuncErrorCallback1(_tvfuncErrorCallback1)
 jones.set_tvfuncErrorCallback2(_tvfuncErrorCallback2)
+jones.set_updateSchemaVarsWith(metatypes.updateSchemaVarsWith)
+jones.set_BType_py(py)
+# OPEN: add a function to check all call-backs etc are set
