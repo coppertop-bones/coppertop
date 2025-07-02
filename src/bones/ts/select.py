@@ -457,7 +457,7 @@ def _typeOf(x) -> pytype + btype:
 
 def _tvfuncErrorCallback1(ex, tvfunc):
     if ex.args and ' required positional argument' in ex.args[0]:
-        # instead of TypeError: createBag() missing 1 required positional argument: 'otherHandSizesById'
+        # instead of TypeError: createHelper() missing 1 required positional argument: 'otherHandSizesById'
         # print out the signature and provided args
         print(ppSig(tvfunc), file=sys.stderr)
         print(ex.args[0], file=sys.stderr)
