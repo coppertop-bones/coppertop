@@ -50,7 +50,10 @@
 # OPEN:
 # - overload count the type (including schema variables) and count the function and ideally count the module
 # - can bones see the Python uber fns? can a call from Python trigger a new function being built? TBC
-
+#
+# IMPORTORTANT OPEN:
+# remove the idea of global (uber) overloads they are just too hard to reason about. Instead, ensure that imports,
+# merge into a family correctly even if that means getting even more down and dirty.
 
 import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)

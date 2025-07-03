@@ -16,8 +16,8 @@ from bones.core.errors import NotYetImplemented
 from bones.core.sentinels import Missing
 from bones import jones
 from bones.jones import BTypeError, BType as BTypeRoot
-from bones.ts.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, bmtsvr
-from bones.ts.core import Constructors
+from bones.ts.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, bmtsvr, \
+    Constructors, TLError
 from bones.ts._type_lang.utils import OnErrorRollback
 from bones.ts._type_lang.fits import fitsWithin
 from bones.core.errors import ProgrammerError, NotYetImplemented, PathNotTested
