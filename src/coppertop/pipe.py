@@ -7,53 +7,52 @@
 # License. See the NOTICE file distributed with this work for additional information regarding copyright ownership.
 # **********************************************************************************************************************
 
-# ## @coppertop and import semantics
+#  changes to import semantics when using coppertop-bones
 #
-# Overloads are not a global concept. They are created locally when two or more functions in a scope share the same
-# name. In bones the compiler can add concrete implementations when it encounters a template.
+# - experience shows that mutating overloads makes a system hard to reason about as extending an overload can change
+#   which function is called on dispatch. I don't know if Julia or Clojure mutate overloads but we do not do this in
+#   coppertop-bones (having tried it)
 #
-# However, in Python we can't hook this so we keep an uber overload that includes the kitchen sink so to speak - e.g. PP
-# might be used generically or within a template, and additionally we have to handle cases where the type is unknown
-# since Python is a dynamic language. We keep the uber overload in its own module virtually named `_`. E.g.
-# `from _ import PP` will import the uber overload of PP. A function implementation may opt out of being added to the
-# uber overload for example to allow `verbose.PP` and `terse.PP` to be used to distinguish differences where the
-# arguments have the same type or it make code more readable. E.g. coppertop.dm.linalg.numpyimp and
-# coppertop.dm.linalg.playimp might be used to switch a whole implementation or coppertop.dm.csv.read and
-# coppertop.dm.xls.read might read better in context.
+# - we have two options for syntax, detect JFuncs in a normal python import or use a special import syntax, i.e.
+#   `from x.y import z` or `from _.x.y import z`.
 #
+# - we've currently implemented the latter to make the fact explicit we are doing something unusual. However:
+#   - it is easy to forget to use the underscore,
+#   - we want to be able to import a Python function from bones and a bones function from Python the underscore causes
+#     us to have to think about import syntax is a clunky way,
+#   so we might change this, with the cost that we then are hooking every import and may need to be more careful.
+#
+# - there is one use case where mutation of an overload is valid - when we have a schema and want to add a concrete
+#   implementation. To keep things sane we will only mutate the actual overload that calls the function with the schema,
+#   caching the concrete generated implementation in case it is needed again by another overload.
+#
+#  - the case for uber overloads was to allow an implementation to be changed behind the scenes, e.g. one could do
+#    `import coppertop.dm.linalg.numpyimp` or `import coppertop.dm.linalg.bonesimp` and then import using
+#    `from _ import coppertop.dm.linalg.orient` or `from _.coppertop.dm.linalg import orient`. There are probably other
+#    ways to do this that are easily to reason about.
 #
 # in modules:
-#
-# @coppertop updates the function in the:
-#   - Python module creating an overload with anything already present - this should make sense for Python programmers
-#   - corresponding bones module - so that we have to explicitly share bones and Python functions
-#   - the global root unless otherwise stated
-#
-# import:
-#   - normal imports override as per normal Python - thus don't update the shared module (which might be inefficient
-#     as it might not be needed)
-#   - from _.x.y import z overloads z in the Python (and bones module?)
-#   - from _ import x gets the uber overload x  - it doesn't need to do anything else as
-#
+# - @coppertop extend any prior name in the module that is a JFunct, raising an error if the name is not a JFunc
+# - import similarly updates any prior name that is a JFunc, BUT will not raise an error is the name is not a JFunc
+#   instead overwriting the name as per normal Python semantics.
 #
 # in functions:
-# `from _ import ...` and `from _.x.y import z` are not implemented but might be given further evidence of need
-# @coppertop does not update any bones modules and only creates a local overload
+# - @coppertop will extend any prior name (inheriting from parent scope), raising an error if the name is not a JFunc
+# - import similarly updates any prior name that is a JFunc (inheriting from parent scope), BUT will not raise an error
+#   is the name is not a JFunc
 #
-# module name - __main__ is mapped to scratch and otherwise it is the python module name
-# redefinition - except in scratch where it is normal redefinition of a function throws an error - need to add
-#                withoutSig function
-#
-# NOTES:
-# - only the uber overload for is mutated
-#
+# - we raise an error if a non-JFunc is imported that would overwrite a JFunc
+
+
 # OPEN:
+# - remove the idea of uber overloads
+# - follow the recommendations in https://docs.python.org/3/library/functions.html#import__ and don't replace
+#   builtins.__import__ but instead use importlib.import_module() or similar
 # - overload count the type (including schema variables) and count the function and ideally count the module
-# - can bones see the Python uber fns? can a call from Python trigger a new function being built? TBC
-#
-# IMPORTORTANT OPEN:
-# remove the idea of global (uber) overloads they are just too hard to reason about. Instead, ensure that imports,
-# merge into a family correctly even if that means getting even more down and dirty.
+# - allow a call from Python to trigger building of a new function
+# - add a binary `selectFn` that returns the tvfunc but doesn't call it, e.g. to get the details of a call could do
+#   `PP >> selectFn >> (cluedoHelper) >> details >> PP` or `cluedoHelper` >> selectFn >> PP >> details >> PP`
+
 
 import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
@@ -67,7 +66,7 @@ __all__ = [
 import inspect, types, builtins
 
 import coppertop as coppertopMod
-coppertopMod.__version__ = "2025.05.01.1"
+coppertopMod.__version__ = "2025.07.05.1"
 from bones import jones
 
 from bones.core.context import context
@@ -352,15 +351,6 @@ def _tArgFromAnnotation(annotation, modname, fnnameForErr, msgForErr):
 # IMPORT HOOK
 # **********************************************************************************************************************
 
-# We wish to allow overloads to be created by importing jones functions into the same module. Normally Python overrides
-# prior exisiting names. For example if we do `from a import fred` followed by `from b import fred` the second fred
-# would replace the first `fred`. Instead we want to create an overload of the two `fred`s.
-#
-# To make our method standout in Python code we introduce the _ module, e.g. `from a import fred` followed by
-# `from _.b import fred` alerts us that something unusual is happening. In the list follow the `import` token we check
-# that each name refers to a JonesFn. We then create the overloads and return them in a new temporary module to the
-# caller.
-
 def _importFromBonesModule(frombmodName, frombmod, tobmodname, tobmod, importersGlobals, namesToImport):
     # we rely on the @coppertop decorator to have already handled the uberFn
     thingsToImport = {}
@@ -410,7 +400,6 @@ def _importFromBonesModule(frombmodName, frombmod, tobmodname, tobmod, importers
     newMod.__dict__.update(thingsToImport)
     return newMod
 
-
 def _coppertopImportFn(name, globals=None, locals=None, fromlist=(), level=0):
     if (splits := name.split('.', maxsplit=1))[0] == '_':
         # print(f"{globals['__name__'].ljust(40)}: name: {name}, len(locals): {len(locals) if locals else 0}, fromList: {fromlist}, level: {level}")
@@ -421,6 +410,7 @@ def _coppertopImportFn(name, globals=None, locals=None, fromlist=(), level=0):
             frombmod = sys._bmodules.get(name, Missing)
         namesToImport = fromlist
         if namesToImport[0] == '*':
+            # OPEN: check for __all__
             namesToImport = []
             for k, fn in frombmod.__dict__.items():
                 if isinstance(fn, (jones._nullary, jones._unary, jones._binary, jones._ternary)):
