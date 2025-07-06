@@ -1,9 +1,7 @@
 SEQUENCE
 
 v0.2
-- no uber, import working as described without _
 - interpreter working for the two failing tests - which implies the list based stack is working?
-- jupyter workbooks working
 - solicit feedback and code review
 
 v0.3

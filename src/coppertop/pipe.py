@@ -60,7 +60,7 @@ __all__ = [
 ]
 
 
-import inspect, types, builtins
+import inspect, types, builtins, logging
 
 import coppertop as coppertopMod
 coppertopMod.__version__ = "2025.07.05.1"
@@ -82,6 +82,7 @@ FN_ONLY_NAMES = []
 class CoppertopError(CPTBError): pass
 class CoppertopImportError(ImportError): pass
 
+_logger = logging.getLogger(__name__)
 
 _ = _UNDERSCORE
 _MANDATORY = inspect._empty      # Python sentinel to indicate an argument has no default (i.e. is not optional)
@@ -277,8 +278,10 @@ def _coppertopImportFn(name, globals=None, locals=None, fromlist=(), level=0):
         modName = globals.get("__name__", "????")
         for n, (current, new) in namesToOverloaded.items():
             dummyMod.__dict__[n] = current.__class__(n, modName, Family(current.d, new.d), _UNDERSCORE)
-        s = "', '"
-        print(f'overloaded \'{s.join(namesToOverloaded.keys())}\' whilst importing from {name} into {globals.get("__name__", "????")}')
+        if context.LogWhenOverloading:
+            s = "', '"
+            msg = f'overloaded \'{s.join(namesToOverloaded.keys())}\' whilst importing from {name} into {globals.get("__name__", "????")}'
+            _logger.warning(msg)
         return dummyMod
     else:
         return mod

@@ -310,8 +310,8 @@ class BType(BTypeRoot):
     # intersection - []
     def __getitem__(self, rhs):  # type[rhs]
         if isinstance(rhs, int):
-            # get's called by dict_keys | btype
-            raise TypeError('perhaps dict_keys | btype?')
+            # gets called by dict_keys | btype, also numpy float64 | btype
+            raise TypeError(f'__getitem__ - perhaps coming from `dict_keys | btype` or `np.float64 | btype`? self = {self}, rhs = {rhs}')
         elif isinstance(rhs, tuple):
             return BTIntersection(*(self, ) + rhs)
         elif isinstance(rhs, str):
