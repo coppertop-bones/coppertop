@@ -387,7 +387,7 @@ class Family(jones.JFamily):
                 ErrSite(cls, "#1")))
         if tvfunc.style != style:
             raiseLess(ProgrammerError(
-                f'Incompatible style - trying to overload {tvfunc.dtyle} function "{tvfunc.name}" with existing {style} function "{name}"',
+                f'Incompatible style - trying to overload {tvfunc.style} function "{tvfunc.name}" with existing {style} function "{name}"',
                 ErrSite(cls, "#10")))
 
 
