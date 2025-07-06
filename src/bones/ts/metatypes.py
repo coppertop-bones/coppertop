@@ -214,8 +214,8 @@ def fitsWithin(a, b, *, fittingSigs=False):
                 return DOES_NOT_FIT
         elif isinstance(b, BType):
             if b == btype:
-                # any BType <: btype
-                return Fits(True, {}, 0)
+                # any BType <: btype but pydict <: pydict is exact
+                return Fits(True, {}, 0.25)
             elif a.id == b.id:
                 return IDENTICAL
             else:

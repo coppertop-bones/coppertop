@@ -13,14 +13,12 @@
 #   which function is called on dispatch. I don't know if Julia or Clojure mutate overloads but we do not do this in
 #   coppertop-bones (having tried it)
 #
-# - we have two options for syntax, detect JFuncs in a normal python import or use a special import syntax, i.e.
-#   `from x.y import z` or `from _.x.y import z`.
+# - we detect JFuncs in a normal python import, i.e. we overload z in `from x.y import z` if it is a JFunc
 #
-# - we've currently implemented the latter to make the fact explicit we are doing something unusual. However:
+# - we experimented with `from x.y import z` to make the fact explicit we are doing something unusual. However:
 #   - it is easy to forget to use the underscore,
-#   - we want to be able to import a Python function from bones and a bones function from Python the underscore causes
-#     us to have to think about import syntax is a clunky way,
-#   so we might change this, with the cost that we then are hooking every import and may need to be more careful.
+#   - since we want to be able to import a Python function from bones and a bones function from Python the underscore
+#     causes us to have to think about import syntax is a clunky way
 #
 # - there is one use case where mutation of an overload is valid - when we have a schema and want to add a concrete
 #   implementation. To keep things sane we will only mutate the actual overload that calls the function with the schema,
@@ -28,13 +26,13 @@
 #
 #  - the case for uber overloads was to allow an implementation to be changed behind the scenes, e.g. one could do
 #    `import coppertop.dm.linalg.numpyimp` or `import coppertop.dm.linalg.bonesimp` and then import using
-#    `from _ import coppertop.dm.linalg.orient` or `from _.coppertop.dm.linalg import orient`. There are probably other
+#    `from _ import coppertop.dm.linalg.orient` or `from coppertop.dm.linalg import orient`. There are probably other
 #    ways to do this that are easily to reason about.
 #
 # in modules:
-# - @coppertop extend any prior name in the module that is a JFunct, raising an error if the name is not a JFunc
+# - @coppertop extend any prior name in the module that is a JFunc, raising an error if the name is not a JFunc
 # - import similarly updates any prior name that is a JFunc, BUT will not raise an error is the name is not a JFunc
-#   instead overwriting the name as per normal Python semantics.
+#   instead overwriting the name as per normal Python semantics
 #
 # in functions:
 # - @coppertop will extend any prior name (inheriting from parent scope), raising an error if the name is not a JFunc
@@ -45,10 +43,9 @@
 
 
 # OPEN:
-# - remove the idea of uber overloads
 # - follow the recommendations in https://docs.python.org/3/library/functions.html#import__ and don't replace
 #   builtins.__import__ but instead use importlib.import_module() or similar
-# - overload count the type (including schema variables) and count the function and ideally count the module
+# - overload type BType "count" (including schema variables) and the JFunc "count" and ideally the module "count"
 # - allow a call from Python to trigger building of a new function
 # - add a binary `selectFn` that returns the tvfunc but doesn't call it, e.g. to get the details of a call could do
 #   `PP >> selectFn >> (cluedoHelper) >> details >> PP` or `cluedoHelper` >> selectFn >> PP >> details >> PP`
@@ -123,15 +120,12 @@ jonesFnByStyle = {
 # DECORATOR
 # **********************************************************************************************************************
 
-def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEvenIfAllTypes=False, local=False):
+def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEvenIfAllTypes=False):
 
     def registerFn(pyfn):
         # answer a jones fn (i.e. that can be partialed, piped or called) that may contain an overload
         style_ = unary if style is Missing else style
-        if name == '*':
-            a = 1
-        updateUber = not local
-        modname, bmod, umod, fnname, pymodFn, enclosingFnName, argNames, sig, tRet, pass_tByT = _fnContext(pyfn, 'registerFn', name)
+        modname, bmod, fnname, pymodFn, enclosingFnName, argNames, sig, tRet, pass_tByT = _fnContext(pyfn, 'registerFn', name)
 
         fn = _tvfunc(
             name=fnname, modname=modname, style=style_, _v=pyfn, dispatchEvenIfAllTypes=dispatchEvenIfAllTypes,
@@ -148,7 +142,6 @@ def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEv
                 else:
                     raise Exception(f'Replacing "{fnname}", which not a jones fn, with a jones fn is not allowed')
         if (bmodFn := bmod.__dict__.get(fnname, Missing)): _checkStyleAndNumArgs(style_, bmodFn, fnname, argNames)
-        if (uberFn := umod.__dict__.get(fnname, Missing)): _checkStyleAndNumArgs(style_, uberFn, fnname, argNames)
 
         # figure exact what to update
         if fnname in FN_ONLY_NAMES and modname == 'scratch':
@@ -162,50 +155,22 @@ def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEv
         else:
             if pymodFn is Missing:
                 if bmodFn is Missing:
-                    if uberFn is Missing:
-                        jf = jonesFnByStyle[style_](fnname, modname, Family(fn), _UNDERSCORE)
-                        bmod.__dict__[fnname] = jf
-                        if updateUber: umod.__dict__[fnname] = jonesFnByStyle[style_](fnname, '_', Family(fn), _UNDERSCORE)
-                        return jf
-                    else:
-                        jf = jonesFnByStyle[style_](fnname, modname, Family(fn), _UNDERSCORE)
-                        bmod.__dict__[fnname] = jf
-                        if updateUber: umod.__dict__[fnname].d = Family(uberFn.d, fn)
-                        return jf
+                    jf = jonesFnByStyle[style_](fnname, modname, Family(fn), _UNDERSCORE)
+                    bmod.__dict__[fnname] = jf
+                    return jf
                 else:
-                    if uberFn is Missing:
-                        jf = jonesFnByStyle[style_](fnname, modname, Family(fn), _UNDERSCORE)
-                        bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, Family(bmodFn.d, fn), _UNDERSCORE)
-                        if updateUber: umod.__dict__[fnname] = jonesFnByStyle[style_](fnname, '_', Family(fn), _UNDERSCORE)
-                        return jf
-                    else:
-                        jf = jonesFnByStyle[style_](fnname, modname, Family(fn), _UNDERSCORE)
-                        bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, Family(bmodFn.d, fn), _UNDERSCORE)
-                        if updateUber: umod.__dict__[fnname].d = Family(uberFn.d, fn)
-                        return jf
+                    jf = jonesFnByStyle[style_](fnname, modname, Family(fn), _UNDERSCORE)
+                    bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, Family(bmodFn.d, fn), _UNDERSCORE)
+                    return jf
             else:
                 if bmodFn is Missing:
-                    if uberFn is Missing:
-                        jf = jonesFnByStyle[style_](fnname, modname, Family(pymodFn.d, fn), _UNDERSCORE)
-                        bmod.__dict__[fnname] = jf
-                        if updateUber: umod.__dict__[fnname] = jonesFnByStyle[style_](fnname, '_', Family(pymodFn.d, fn), _UNDERSCORE)
-                        return jf
-                    else:
-                        jf = jonesFnByStyle[style_](fnname, modname, Family(pymodFn.d, fn), _UNDERSCORE)
-                        bmod.__dict__[fnname] = jf
-                        if updateUber: umod.__dict__[fnname].d = Family(uberFn.d, jf.d)
-                        return jf
+                    jf = jonesFnByStyle[style_](fnname, modname, Family(pymodFn.d, fn), _UNDERSCORE)
+                    bmod.__dict__[fnname] = jf
+                    return jf
                 else:
-                    if uberFn is Missing:
-                        jf = jonesFnByStyle[style_](fnname, modname, Family(pymodFn.d, fn), _UNDERSCORE)
-                        bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, Family(bmodFn.d, jf.d), _UNDERSCORE)
-                        if updateUber: umod.__dict__[fnname] = jonesFnByStyle[style_](fnname, '_', Family(pymodFn.d, fn), _UNDERSCORE)
-                        return jf
-                    else:
-                        jf = jonesFnByStyle[style_](fnname, modname, Family(pymodFn.d, fn), _UNDERSCORE)
-                        bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, Family(bmodFn.d, jf.d), _UNDERSCORE)
-                        if updateUber: umod.__dict__[fnname].d = Family(uberFn.d, jf.d)
-                        return jf
+                    jf = jonesFnByStyle[style_](fnname, modname, Family(pymodFn.d, fn), _UNDERSCORE)
+                    bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, Family(bmodFn.d, jf.d), _UNDERSCORE)
+                    return jf
 
 
     if len(args) == 1 and isinstance(args[0], (types.FunctionType, types.MethodType, builtins.type)):
@@ -319,7 +284,7 @@ def _fnContext(pyfn, callerFnName, name):
                             f"Coppertop fns cannot have optional arguments - {modname}.{fnname} arg '{argName}' has a default value"),
                         ErrSite("has VAR_KEYWORD")
                     )
-    return modname, _getBModuleForName('_.' + modname), _getBModuleForName('_'), fnname, priorX, enclosingFnName, argNames, sig, tRet, pass_tByT
+    return modname, _getBModuleForName('_.' + modname), fnname, priorX, enclosingFnName, argNames, sig, tRet, pass_tByT
 
 def _tArgFromAnnotation(annotation, modname, fnnameForErr, msgForErr):
     if isinstance(annotation, BType):
@@ -351,79 +316,31 @@ def _tArgFromAnnotation(annotation, modname, fnnameForErr, msgForErr):
 # IMPORT HOOK
 # **********************************************************************************************************************
 
-def _importFromBonesModule(frombmodName, frombmod, tobmodname, tobmod, importersGlobals, namesToImport):
-    # we rely on the @coppertop decorator to have already handled the uberFn
-    thingsToImport = {}
-    for n in namesToImport:
-        pymodJf = importersGlobals.get(n, Missing)
-        current = tobmod.__dict__.get(n, Missing)
-        if (addition := frombmod.__dict__.get(n, Missing)) is Missing:
-            raise CoppertopImportError(f'"{n}" does not exisit in bones module "{frombmodName}"')
-        if frombmodName == '_':
-            # importing an uberFn implies we want everything
-            thingsToImport[n] = addition
-        elif pymodJf is Missing:
-            if not isinstance(addition, (jones._fn, jones._pfn)) and not isinstance(addition, BType):
-                raise CoppertopImportError(f'Trying to import "{n}" which is a {builtins.type(addition)}')
-            if current is Missing:
-                tobmod.__dict__[n] = addition.__class__(n, tobmodname, Family(addition.d), _UNDERSCORE)
-            else:
-                tobmod.__dict__[n] = current.__class__(n, tobmodname, Family(current.d, addition.d), _UNDERSCORE)
-            thingsToImport[n] = addition
-        elif isinstance(pymodJf, (jones._fn, jones._pfn)):
-            if isinstance(addition, (jones._fn, jones._pfn)):
-                # overload current and addition
-                if current is Missing:
-                    tobmod.__dict__[n] = addition.__class__(n, tobmodname, Family(addition.d), _UNDERSCORE)
-                    thingsToImport[n] = addition.__class__(n, tobmodname, Family(pymodJf.d, addition.d), _UNDERSCORE)
-                else:
-                    if _styleOfFn(current) != _styleOfFn(addition):
-                        raise CoppertopImportError(f'"{n} is a {_styleOfFn(current)} in {tobmodname} but a {_styleOfFn(addition)} in {frombmodName}')
-                    tobmod.__dict__[n] = current.__class__(n, tobmodname, Family(current.d, addition.d), _UNDERSCORE)
-                    thingsToImport[n] = current.__class__(current.name, tobmodname, Family(pymodJf.d, addition.d), _UNDERSCORE)
-            elif isinstance(addition, BType):
-                raise NotYetImplemented("overloading type and jonesFn")
-            else:
-                raise CoppertopImportError(f'Trying to import "{n}", which is a {builtins.type(addition)} to overwrite a {builtins.type(current)}!!!')
-        elif isinstance(current, BType):
-            if isinstance(addition, (jones._fn, jones._pfn)):
-                raise NotYetImplemented("overloading type and jonesFn")
-            elif isinstance(addition, BType):
-                # no need to import anything but just check they are the same
-                if current._id != addition._id: raise CoppertopImportError(f"Type {n} is different in {frombmodName}")
-            else:
-                raise CoppertopImportError(f'Trying to import "{n}", which is a {builtins.type(addition)} to overwrite a {builtins.type(current)}!!!')
-        else:
-            raise CoppertopImportError(f'"{n}" is not a jones function nor a jones type')
-
-    newMod = BModule(name="_importFromBonesModule")
-    newMod.__dict__.update(thingsToImport)
-    return newMod
-
 def _coppertopImportFn(name, globals=None, locals=None, fromlist=(), level=0):
-    if (splits := name.split('.', maxsplit=1))[0] == '_':
-        # print(f"{globals['__name__'].ljust(40)}: name: {name}, len(locals): {len(locals) if locals else 0}, fromList: {fromlist}, level: {level}")
-        if not fromlist:
-            raise CoppertopImportError("_ is a virtual package that cannot be imported and has no importable submodules - usage is 'from _.x.y import z'")
-        if (frombmod := sys._bmodules.get(name, Missing)) is Missing:
-            sys._preCoppertopImportFn(splits[1], globals, locals, fromlist, level)
-            frombmod = sys._bmodules.get(name, Missing)
-        namesToImport = fromlist
-        if namesToImport[0] == '*':
-            # OPEN: check for __all__
-            namesToImport = []
-            for k, fn in frombmod.__dict__.items():
-                if isinstance(fn, (jones._nullary, jones._unary, jones._binary, jones._ternary)):
-                    namesToImport.append(k)
-        if globals['__name__'] == '__main__':
-            tobmodname = SCRATCH
-            tobmod = sys._bmodules.get(SCRATCH, Missing)
-        else:
-            tobmodname = '_.' + globals['__name__']
-            tobmod = sys._bmodules.get(tobmodname, Missing)
-        return _importFromBonesModule(name, frombmod, tobmodname, tobmod, globals, namesToImport)
+    if not fromlist or not name or not globals: return sys._preCoppertopImportFn(name, globals, locals, fromlist, level)
+    mod = sys._preCoppertopImportFn(name, globals, locals, fromlist, level)
+    if fromlist == ('*',):
+        if (namesToImport := getattr(mod, '__all__', Missing)) is Missing:
+            namesToImport = sorted([k for k in mod.__dict__.keys() if not k.startswith('__')])
     else:
-        mod = sys._preCoppertopImportFn(name, globals, locals, fromlist, level)
+        namesToImport = fromlist
+    namesToOverloaded = {}
+    for n in namesToImport:
+        if (current := globals.get(n, Missing)) is not Missing and isinstance(current, (jones._fn, jones._pfn)):
+            if isinstance(new := getattr(mod, n), (jones._fn, jones._pfn)):
+                if new is not current:
+                    namesToOverloaded[n] = (current, new)
+    if namesToOverloaded:
+        dummyMod = builtins.type(mod)(name)
+        for n in namesToImport:
+            dummyMod.__dict__[n] = getattr(mod, n)
+        modName = globals.get("__name__", "????")
+        for n, (current, new) in namesToOverloaded.items():
+            dummyMod.__dict__[n] = current.__class__(n, modName, Family(current.d, new.d), _UNDERSCORE)
+        s = "', '"
+        print(f'overloaded \'{s.join(namesToOverloaded.keys())}\' whilst importing from {name} into {globals.get("__name__", "????")}')
+        return dummyMod
+    else:
         return mod
 
 sys._coppertopImportFn = _coppertopImportFn
@@ -453,7 +370,7 @@ def makeFn(*args):
         name, _t, pyfn = args[0], args[1], args[2]
     else:
         raise TypeError('Wrong number of args passed to partial', ErrSite("#1"))
-    modname, bmod, umod, fnname, priorPy, enclosingFnName, argNames, sig, tRet, pass_tByT = _fnContext(pyfn, 'anon', name)
+    modname, _, fnname, _, _, argNames, _, _, pass_tByT = _fnContext(pyfn, 'anon', name)
     if _t is Missing:
         _t = BTFn(BTTuple(*[py] * len(argNames)), py)
     tvfunc = _tvfunc(
