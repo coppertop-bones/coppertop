@@ -289,10 +289,8 @@ def _coppertopImportFn(name, globals=None, locals=None, fromlist=(), level=0):
 sys._coppertopImportFn = _coppertopImportFn
 
 if not hasattr(sys, '_coppertopImportFnHolder'):
-    def _coppertopImportFnHolder(name, globals=None, locals=None, fromlist=(), level=0):
-        return sys._coppertopImportFn(name, globals, locals, fromlist, level)
     sys._preCoppertopImportFn = builtins.__import__
-    builtins.__import__ = _coppertopImportFnHolder
+    builtins.__import__ = _coppertopImportFn
 
 
 
