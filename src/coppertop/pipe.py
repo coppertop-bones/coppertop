@@ -68,7 +68,7 @@ from bones import jones
 
 from bones.core.context import context
 from coppertop._scopes import _UNDERSCORE
-from bones.core.errors import ErrSite, CPTBError, NotYetImplemented
+from bones.core.errors import ErrSite, CPTBError
 from bones.core.sentinels import Missing
 from bones.core.utils import raiseLess
 from bones.ts.metatypes import BType, fitsWithin as origFitsWithin, BTFn, BTTuple, BTAtom, _btypeByClass
@@ -76,44 +76,24 @@ from bones.lang.types import nullary, unary, binary, ternary, _tvfunc, btype, py
 from bones.ts.select import Family, ppSig
 
 
-py = BType('py: atom in mem')
+_py = BType('py: atom in mem')
 FN_ONLY_NAMES = []
 
 class CoppertopError(CPTBError): pass
 class CoppertopImportError(ImportError): pass
 
-class BModule(types.ModuleType):
-    def __repr__(self):
-        return f'BModule({self.__name__})'
-
-    def __getattribute__(self, name):
-        try:
-            answer = super().__getattribute__(name)
-        except AttributeError as ex:
-            raise AttributeError(
-                f'bones module "{self.__name__}" has no attribute "{name}" - maybe it\'s defined in a python module '
-                f'that needs to be imported'
-            ) from None
-        return answer
-
-
-sys._bmodules = {'': BModule('')}   # NOTE: bones modules live in sys._bmodules
-_unhandledTypes = set()             # OPEN: do we still need this?
-
 
 _ = _UNDERSCORE
-MANDATORY = inspect._empty      # Python sentinel to indicate an argument has no default (i.e. is not optional)
-NO_ANNOTATION = inspect._empty  # Python sentinel to indicate an argument has no annotation
-SCRATCH = 'scratch'
+_MANDATORY = inspect._empty      # Python sentinel to indicate an argument has no default (i.e. is not optional)
+_NO_ANNOTATION = inspect._empty  # Python sentinel to indicate an argument has no annotation
+_SCRATCH = 'scratch'
 
-
-jonesFnByStyle = {
+_jonesFnByStyle = {
     nullary: jones._nullary,
     unary: jones._unary,
     binary: jones._binary,
     ternary: jones._ternary,
 }
-
 
 
 # **********************************************************************************************************************
@@ -125,7 +105,7 @@ def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEv
     def registerFn(pyfn):
         # answer a jones fn (i.e. that can be partialed, piped or called) that may contain an overload
         style_ = unary if style is Missing else style
-        modname, bmod, fnname, pymodFn, enclosingFnName, argNames, sig, tRet, pass_tByT = _fnContext(pyfn, 'registerFn', name)
+        modname, fnname, pymodFn, enclosingFnName, argNames, sig, tRet, pass_tByT = _fnContext(pyfn, 'registerFn', name)
 
         fn = _tvfunc(
             name=fnname, modname=modname, style=style_, _v=pyfn, dispatchEvenIfAllTypes=dispatchEvenIfAllTypes,
@@ -137,40 +117,25 @@ def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEv
             if isinstance(pymodFn, jones._fn):
                 _checkStyleAndNumArgs(style_, pymodFn, fnname, argNames)
             else:
-                if modname == SCRATCH:
+                if modname == _SCRATCH:
                     pymodFn = Missing
                 else:
                     raise Exception(f'Replacing "{fnname}", which not a jones fn, with a jones fn is not allowed')
-        if (bmodFn := bmod.__dict__.get(fnname, Missing)): _checkStyleAndNumArgs(style_, bmodFn, fnname, argNames)
 
         # figure exact what to update
         if fnname in FN_ONLY_NAMES and modname == 'scratch':
-            bf = jonesFnByStyle[style_](fnname, modname, pyfn, _UNDERSCORE)
+            bf = _jonesFnByStyle[style_](fnname, modname, pyfn, _UNDERSCORE)
             return bf
         if enclosingFnName:
             if pymodFn is Missing:
-                return jonesFnByStyle[style_](fnname, modname + '.' + enclosingFnName, Family(fn), _UNDERSCORE)
+                return _jonesFnByStyle[style_](fnname, modname + '.' + enclosingFnName, Family(fn), _UNDERSCORE)
             else:
-                return jonesFnByStyle[style_](fnname, modname + '.' + enclosingFnName, Family(pymodFn.d, fn), _UNDERSCORE)
+                return _jonesFnByStyle[style_](fnname, modname + '.' + enclosingFnName, Family(pymodFn.d, fn), _UNDERSCORE)
         else:
             if pymodFn is Missing:
-                if bmodFn is Missing:
-                    jf = jonesFnByStyle[style_](fnname, modname, Family(fn), _UNDERSCORE)
-                    bmod.__dict__[fnname] = jf
-                    return jf
-                else:
-                    jf = jonesFnByStyle[style_](fnname, modname, Family(fn), _UNDERSCORE)
-                    bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, Family(bmodFn.d, fn), _UNDERSCORE)
-                    return jf
+                return _jonesFnByStyle[style_](fnname, modname, Family(fn), _UNDERSCORE)
             else:
-                if bmodFn is Missing:
-                    jf = jonesFnByStyle[style_](fnname, modname, Family(pymodFn.d, fn), _UNDERSCORE)
-                    bmod.__dict__[fnname] = jf
-                    return jf
-                else:
-                    jf = jonesFnByStyle[style_](fnname, modname, Family(pymodFn.d, fn), _UNDERSCORE)
-                    bmod.__dict__[fnname] = jonesFnByStyle[style_](fnname, modname, Family(bmodFn.d, jf.d), _UNDERSCORE)
-                    return jf
+                return _jonesFnByStyle[style_](fnname, modname, Family(pymodFn.d, fn), _UNDERSCORE)
 
 
     if len(args) == 1 and isinstance(args[0], (types.FunctionType, types.MethodType, builtins.type)):
@@ -206,28 +171,6 @@ def _checkStyleAndNumArgs(style, fn, fnname, argNames):
     if len(argNames) < 2 and style == binary: raise CoppertopError(f'{fnname} has style binary but only has {len(argNames)} args ({", ".join(argNames)})')
     if len(argNames) < 3 and style == ternary: raise CoppertopError(f'{fnname} has style ternary but only has {len(argNames)} arg ({", ".join(argNames)})')
 
-def _getBModuleForName(modname):
-    bmodule = sys._bmodules.get(modname, Missing)
-    if bmodule is Missing:
-        bmodule = BModule(modname)
-        sys._bmodules[modname] = bmodule
-        splits = modname.split('.')
-        parentname = ''
-        for subname in splits:
-            if (parentmod := sys._bmodules.get(parentname, Missing)) is Missing:
-                parentmod = BModule(parentname)
-                sys._bmodules[parentname] = parentmod
-            modname = parentname + ('.' if parentname else '') + subname
-            if (mod := sys._bmodules.get(modname, Missing)) is Missing:
-                mod = BModule(modname)
-                sys._bmodules[modname] = mod
-            if subname not in parentmod.__dict__:
-                parentmod.__dict__[subname] = mod
-            else:
-                if not isinstance(parentmod.__dict__[subname], BModule): raise Exception("conflict")
-            parentname = modname
-    return bmodule
-
 def _fnContext(pyfn, callerFnName, name):
     # go up the stack to the frame where @coppertop is used to find any prior definition (e.g. import) of the function
     frame = inspect.currentframe()  # do not use `frameInfos = inspect.stack(0)` as it is much much slower
@@ -249,7 +192,7 @@ def _fnContext(pyfn, callerFnName, name):
     if priorX is Missing: priorX = frame.f_globals.get(fnname, Missing)
     modname = frame.f_globals.get('__name__', Missing)
     if modname is Missing: raise CoppertopError('frame has no __name__')
-    if modname == '__main__': modname = SCRATCH
+    if modname == '__main__': modname = _SCRATCH
     # fi_debug = inspect.getframeinfo(frame, context=0)
     globals__package__ = frame.f_globals.get('__package__', Missing)
     # '<cell line: ' is what Jupyter displays at this point in the stack - OPEN: make more robust
@@ -274,31 +217,28 @@ def _fnContext(pyfn, callerFnName, name):
                     ErrSite("has VAR_KEYWORD")
                 )
             else:
-                if parameter.default == MANDATORY:
+                if parameter.default == _MANDATORY:
                     argNames += [argName]
                     tArg = _tArgFromAnnotation(parameter.annotation, modname, fnname, f'parameter {argName} has an unhandled argument type ')
                     sig.append(tArg)
                 else:
                     raiseLess(
-                        TypeError(
-                            f"Coppertop fns cannot have optional arguments - {modname}.{fnname} arg '{argName}' has a default value"),
+                        TypeError(f"Coppertop fns cannot have optional arguments - {modname}.{fnname} arg '{argName}' has a default value"),
                         ErrSite("has VAR_KEYWORD")
                     )
-    return modname, _getBModuleForName('_.' + modname), fnname, priorX, enclosingFnName, argNames, sig, tRet, pass_tByT
+    return modname, fnname, priorX, enclosingFnName, argNames, sig, tRet, pass_tByT
 
 def _tArgFromAnnotation(annotation, modname, fnnameForErr, msgForErr):
     if isinstance(annotation, BType):
         return annotation
-    elif annotation == NO_ANNOTATION:
-        return py
+    elif annotation == _NO_ANNOTATION:
+        return _py
     elif isinstance(annotation, builtins.type):
         if (tArg := _btypeByClass.get(annotation, Missing)) is Missing:
             name = annotation.__module__ + "." + annotation.__name__
             tArg = BTAtom(name)
             _btypeByClass[annotation] = tArg
         return tArg
-    elif annotation in _unhandledTypes:
-        raise TypeError(f'{modname}.{fnnameForErr} - {msgForErr}{annotation}, use {_btypeByClass[annotation]} instead', ErrSite("illegal argument type"))
     elif isinstance(annotation, str):
         raise TypeError(
             f'{modname}.{fnnameForErr} - {msgForErr} str - has `from __future__ import annotations` been invoked in the module',
@@ -370,9 +310,9 @@ def makeFn(*args):
         name, _t, pyfn = args[0], args[1], args[2]
     else:
         raise TypeError('Wrong number of args passed to partial', ErrSite("#1"))
-    modname, _, fnname, _, _, argNames, _, _, pass_tByT = _fnContext(pyfn, 'anon', name)
+    modname, fnname, _, _, argNames, _, _, pass_tByT = _fnContext(pyfn, 'anon', name)
     if _t is Missing:
-        _t = BTFn(BTTuple(*[py] * len(argNames)), py)
+        _t = BTFn(BTTuple(*[_py] * len(argNames)), _py)
     tvfunc = _tvfunc(
         name=fnname, modname=modname, style=unary, _v=pyfn, dispatchEvenIfAllTypes=False,
         typeHelper=Missing, _t=_t, argNames=argNames, pass_tByT=False
