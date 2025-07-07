@@ -268,7 +268,9 @@ def _coppertopImportFn(name, globals=None, locals=None, fromlist=(), level=0):
     namesToOverloaded = {}
     for n in namesToImport:
         if (current := globals.get(n, Missing)) is not Missing and isinstance(current, (jones._fn, jones._pfn)):
-            if isinstance(new := getattr(mod, n), (jones._fn, jones._pfn)):
+            new = getattr(mod, n, Missing)
+            if new is Missing: raise ImportError(f'Cannot import "{n}" from {name} - it does not exist')
+            if isinstance(new, (jones._fn, jones._pfn)):
                 if new is not current:
                     namesToOverloaded[n] = (current, new)
     if namesToOverloaded:
