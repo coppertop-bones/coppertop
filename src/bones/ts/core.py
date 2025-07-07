@@ -12,6 +12,7 @@ if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 
 from bones.ts._type_lang.jones_type_manager import BTypeError
+from bones.jones import SchemaError
 
 
 bmtnul = 0      # i.e. not initialised yet
@@ -47,6 +48,5 @@ bmtnameById = {
 
 
 class TLError(Exception): pass
-class SchemaError(BTypeError): pass
 
 class Constructors(list): pass

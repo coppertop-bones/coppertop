@@ -8,17 +8,20 @@
 # **********************************************************************************************************************
 
 import sys
+if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
+
+import builtins
 
 from bones.core.errors import NotYetImplemented
 from bones.core.sentinels import Missing
 from bones import jones
 from bones.jones import BTypeError, BType as BTypeRoot
-from bones.ts.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, bmtsvr
-from bones.ts.core import Constructors
+from bones.ts.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, bmtsvr, \
+    Constructors, TLError
 from bones.ts._type_lang.utils import OnErrorRollback
 from bones.ts._type_lang.fits import fitsWithin
 from bones.core.errors import ProgrammerError, NotYetImplemented, PathNotTested
-from bones.core.utils import raiseLess
+from bones.core.utils import raiseLess, firstValue
 from bones.core.errors import ErrSite
 from bones.core.context import context
 from bones.ts.type_lang import TypeLangInterpreter
@@ -28,6 +31,7 @@ NaT = 0
 _btcls_by_bmtid = {}
 _btypeByClass = {}                   # mappings from python classes to bones types
 _BTypeById = [Missing] * 10000
+REPL_OVERRIDE_MODE = False
 
 
 
@@ -37,6 +41,14 @@ def getBTypeForClass(cls):
         t = BTAtom(name, space=BType('mem'))
         _btypeByClass[cls] = t
     return t
+
+def _ensurePyBType(x):
+    if not isinstance(x, BType) and not isinstance(x, type):
+        bmtid = sys._gtm.bmtid(x)
+        cls = _btcls_by_bmtid[bmtid]
+        return sys._gtm.replaceWith(x, cls._new(x))
+    else:
+        return x
 
 
 # **********************************************************************************************************************
@@ -132,9 +144,22 @@ class BType(BTypeRoot):
             if (coercer := self._coercer) is Missing:
                 if isinstance(self, BTIntersection):
                     # if we are an intersection type then check if one is in the intersection's types
-                    for t in self.types:
-                        if (coercer := t._coercer) is not Missing:
-                            break
+                    coercers = {t:t._coercer for t in self.types if hasattr(t, '_coercer') and t._coercer is not Missing}
+                    if len(coercers) == 0:
+                        pass
+                    elif len(coercers) == 1:
+                        coercer = firstValue(coercers)
+                    else:
+                        for t in list(coercers.keys()):
+                            if isinstance(t, BTIntersection):
+                                for tChild in t.types:
+                                    if tChild != t:
+                                        coercers.pop(tChild, None)
+                        if len(coercers) == 1:
+                            coercer = firstValue(coercers)
+                        else:
+                            msg = f'`{repr(instance)}` can\'t be coerced to <:{self}> - instance has no _asT, type (or intersection\'s types) has more than one _coercer'
+                            raiseLess(BTypeError(msg, ErrSite(self.__class__)))
             if coercer:
                 return coercer(self, instance)
             else:
@@ -268,7 +293,7 @@ class BType(BTypeRoot):
         elif not isinstance(rhs, BType):
             raise BTypeError(f'rhs should be a BType or type - got {repr(rhs)}')
         if self.__class__ is BTFn:
-            return BTOverload(self, rhs)
+            return BTFamily(self, rhs)
         else:
             return BTIntersection(self, rhs)
 
@@ -278,22 +303,22 @@ class BType(BTypeRoot):
         elif not isinstance(lhs, BType):
             raise BTypeError(f'lhs should be a BType or type - got {repr(lhs)}')
         if self.__class__ is BTFn:
-            return BTOverload(lhs, self)
+            return BTFamily(lhs, self)
         else:
             return BTIntersection(lhs, self)
 
     # intersection - []
     def __getitem__(self, rhs):  # type[rhs]
         if isinstance(rhs, int):
-            # get's called by dict_keys | btype
-            raise TypeError('perhaps dict_keys | btype?')
+            # gets called by dict_keys | btype, also numpy float64 | btype
+            raise TypeError(f'__getitem__ - perhaps coming from `dict_keys | btype` or `np.float64 | btype`? self = {self}, rhs = {rhs}')
         elif isinstance(rhs, tuple):
             return BTIntersection(*(self, ) + rhs)
         elif isinstance(rhs, str):
             raise TypeError()
         else:
             if self.__class__ is BTFn:
-                return BTOverload(self, rhs)
+                return BTFamily(self, rhs)
             else:
                 return BTIntersection(self, rhs)
 
@@ -386,7 +411,7 @@ class BTIntersection(BType):
         if len(types) == 0: raise ProgrammerError('No types provided')
         if len(types) == 1: return types[0]
         tm = sys._gtm
-        bt = tm.intersection([t if isinstance(t, BType) else getBTypeForClass(t) for t in types], space=space)
+        bt = tm.intersection([getBTypeForClass(t) if isinstance(t, type) else _ensurePyBType(t) for t in types], space=space)
         return bt if isinstance(bt, cls) else tm.replaceWith(bt, cls._new(bt))
 
     @classmethod
@@ -433,7 +458,7 @@ class BTIntersection(BType):
         hasCompound = False
         for t in self.types:
             if t.id == self.id:
-                pp, compound, childCompound = 'self', False, False
+                pp, compound, childCompound = self.name, False, False
             elif isinstance(t, BType):
                 pp, compound, childCompound = ppT(t)
             else:
@@ -444,7 +469,7 @@ class BTIntersection(BType):
 
 
 
-class BTOverload(BTIntersection):
+class BTFamily(BTIntersection):
 
     def ppT(self):
         if a := self.ppName(): return a
@@ -464,7 +489,7 @@ class BTUnion(BType):
         if len(types) == 0: raise ProgrammerError('No types provided')
         if len(types) == 1: return types[0]
         tm = sys._gtm
-        bt = tm.union([t if isinstance(t, BType) else getBTypeForClass(t) for t in types])
+        bt = tm.union([getBTypeForClass(t) if isinstance(t, type) else _ensurePyBType(t) for t in types])
         return bt if isinstance(bt, cls) else tm.replaceWith(bt, cls._new(bt))
 
     @property
@@ -542,17 +567,18 @@ class BTStruct(BType):
     # product type accessed by name
 
     def __new__(cls, *args, btype=Missing, **kwargs):
+        # OPEN: for moment convert suymbols to strings
         if args:
             if len(args) == 1 and isinstance(args[0], dict):
-                names = tuple(args[0].keys())
+                names = tuple((str(a) for a in args[0].keys()))
                 types = tuple(args[0].values())
             elif len(args) == 2 and isinstance(args[0], (tuple, list)) and isinstance(args[1], (tuple, list)):
-                names = tuple(args[0])
+                names = tuple((str(a) for a in args[0]))
                 types = tuple(args[1])
             else:
                 raise BTypeError('Unhandled case')
         else:
-            names = tuple(kwargs.keys())
+            names = tuple((str(a) for a in kwargs.keys()))
             types = tuple(kwargs.values())
         if len(names) != len(types):
             raise BTypeError('names and types must be of same length')
@@ -585,6 +611,7 @@ class BTSeq(BType):
 
     def __new__(cls, mappedType):
         tm = sys._gtm
+        mappedType = getBTypeForClass(mappedType) if isinstance(mappedType, type) else _ensurePyBType(mappedType)
         bt = tm.seq(mappedType)
         return bt if isinstance(bt, cls) else tm.replaceWith(bt, cls._new(bt))
 
@@ -658,7 +685,6 @@ class BTFn(BType):
         return len(sys._gtm.tupleTl((sys._gtm.fnTArgs(self))))
 
 
-
 class BTSchemaVariable(BTAtom):
     # T1, T2, etc - NB: the term schema means a model / schematic whereas the term scheme means a plan of action
 
@@ -674,6 +700,39 @@ class BTSchemaVariable(BTAtom):
             else:
                 bt = tm.bind(name, tm.schemavar())
         return bt if isinstance(bt, cls) else tm.replaceWith(bt, cls._new(bt))
+
+
+class _AddStuff:
+    def __init__(self, t):
+        self.t = t
+    def __ror__(self, instance):    # instance | type
+        if hasattr(instance, '_t'):
+            return instance | BTIntersection(instance._t, self.t)
+        else:
+            return instance | BTIntersection(builtins.type(instance), self.t)
+
+
+class _SubtractStuff:
+    def __init__(self, t):
+        self.t = t
+    def __ror__(self, instance):  # instance | type
+        if not isinstance(t := instance._t if hasattr(instance, '_t') else builtins.type(instance), BTIntersection):
+            raise BTypeError(f'Can only subtract a type from an intersection but LHS type is {t}')
+        tlLhs = t.types
+        tlRhs = self.t.types if isinstance(self.t, BTIntersection) else (self.t, )
+        a_, ab, b_, weakenings = _partitionIntersectionTLs(tlLhs, tlRhs)
+        if b_:
+            raise BTypeError(f'RHS is trying to subtract {b_} which isn\'t in the LHS {t} - {self.t}')
+        if not ab:
+            raise ProgrammerError(f'Can\'t end up subtracting nothing')
+        if not a_:
+            raise BTypeError('Left with null set')
+        if len(a_) == 1:
+            return instance | a_[0]
+        else:
+            new_t = sys._gtm.intersectionNoCheck(a_)
+            return instance | _ensurePyBType(new_t)
+
 
 
 
@@ -693,12 +752,12 @@ def ppT(t):
     return (t.__name__, False, False) if isinstance(t, type) else t.ppT()
 
 
-def extractTypeFromConstructionArgs(args):
-    if args and isinstance(args[0], Constructors):
-        t, args = args[0][0], args[1:]
+def extractConstructors(args_, kwargs_):
+    if args_ and isinstance(args_[0], Constructors):
+        constr, args = args_[0][0], args_[1:]
     else:
-        t = Missing
-    return t, args
+        constr, args = Missing, args_
+    return constr, args, kwargs_
 
 
 
@@ -812,6 +871,7 @@ class JonesTypeManager:
         return self._tm.intersection(*types, space=space or None, btype=btype or None)
 
     def intersectionNoCheck(self, types):
+        types = [getBTypeForClass(t) if isinstance(t, type) else _ensurePyBType(t) for t in types]
         return self._tm.intersectionNoCheck(*types)
 
     def intersectionTl(self, t):
@@ -869,7 +929,7 @@ class JonesTypeManager:
         return self._tm.schemavar(btype=btype or None)
 
     def seq(self, contained, *, btype=Missing):
-        return self._tm.seq(contained, btype=btype or None)
+        return _ensurePyBType(self._tm.seq(contained, btype=btype or None))
 
     def seqT(self, btype):
         return self._tm.seqT(btype)
@@ -910,88 +970,4 @@ JonesTypeManager.fitsWithin = fitsWithin
 if not hasattr(sys, '_gtm'):
     sys._gtm = JonesTypeManager()
     sys._gtli = TypeLangInterpreter(sys._gtm)
-
-
-
-# intersection get or create
-# get intersect_tlid
-# btype = lookup_intersection
-# if not found
-#     btype = reserve(optional space)
-#     btype = intersect(self, tlid)
-# if btype and space
-#     assert btype.space == space
-# return btype
-#
-#
-# intersection create and bind
-#
-
-# reserve -> note_tbc, add_tbc, make_tbc, tbc, create_tbc
-#
-# confirm_inter_in
-# confirm_tuple
-#
-# vs
-# inter_in(B_NAT or tbcId, ...),
-# tuple(B_NAT or tbcId, ...),
-
-
-
-# we are trying to avoid accidentally create an intersection that we later want to create in a space
-#
-# 5 cases
-# fred: A & B
-# fred: fred & B
-# (A&B)
-# fred: A & B in C
-# fred: fred & B in C
-#
-# (A&B) will get A & B in C or A & B if fred is already bound or create A & B (not in C) if not already bound
-# (A & B in C) is illegal
-#
-#
-# test1 => GBP: GBP_ & ccy in ccyfx
-# test2 => GBP: GBP & ccy in ccyfx
-# test3 => GBP: GBP & ccy in ccy
-#
-# // &
-# GBP = lookupOrImplicitTbc(GBP) => bind(GBP, reserve())
-# ccy = lookupOrImplicitTbc(ccy)
-#
-# // in
-# ccyfx = lookup(ccyfx)
-#
-# // bind
-# GBP = lookup(GBP)
-#
-# // create and bind
-# if GBP is tbc:
-#     bind(GBP, confirm_inter_in(self=GBP, types=(GBP, ccy), space=ccyfx)) OR
-#     bind(GBP, inter_in(self=GBP, types=(GBP, ccy), space=ccyfx))
-# elif GBP is B_NAT:
-#     bind(GBP, inter_in(types=(GBP, ccy), space=ccyfx)) OR
-#     bind(GBP, inter_in(self=B_NEW, types=(GBP, ccy), space=ccyfx))
-# else:
-#     assert GBP == inter(types=(GBP, ccy))
-#
-# can't be in yourself? yes, here's a counter example
-# domfor: {dom: ccy & T1, for: ccy & T2} & domfor in domfor
-# {dom:GBP, for:USD} & domfor in domfor
-# {dom:USD, for:JPY} & domfor in domfor
-
-#
-# to be confirmed
-# confirm
-#
-# to be defined
-# define
-# however surely fred: ... is a define too
-
-
-
-# I was trying to make it impossible to mutate via the api
-# but I think that is impossible so instead we should just make it hard
-
-
 

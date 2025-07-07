@@ -20,27 +20,27 @@ import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 
-__all__ = ['BType', 'BTypeError', 'SchemaError', 'extractTypeFromConstructionArgs']
+__all__ = ['BType', 'BTypeError', 'SchemaError', 'extractConstructors']
 
 import itertools, builtins, collections, statistics
 
+from bones.jones import Fits, SchemaError
+import bones.ts._type_lang.jones_type_manager
 from bones.ts._type_lang.jones_type_manager import JonesTypeManager, BType, BTAtom, BTIntersection, BTUnion, \
-    BTTuple, BTStruct, BTSeq, BTMap, BTFn, BTSchemaVariable, BTOverload, BTypeError, ppT, _btcls_by_bmtid, \
-    extractTypeFromConstructionArgs
+    BTTuple, BTStruct, BTSeq, BTMap, BTFn, BTSchemaVariable, BTFamily, BTypeError, ppT, _btcls_by_bmtid, \
+    extractConstructors
 from bones.ts.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, \
-    bmtsvr, bmtnameById, SchemaError
+    bmtsvr, bmtnameById
 from bones.ts._type_lang.jones_type_manager import _btypeByClass, _BTypeById     # used by coppertop.pipe - do not remove
 from bones.ts.type_lang import TypeLangInterpreter
 
 from bones.core.errors import ProgrammerError, NotYetImplemented, PathNotTested
-from bones.core.sentinels import Missing, Void, generator
+from bones.core.sentinels import Missing
 
 
 _verboseNames = False
 
 _idSeed = itertools.count(start=1)              # reserve id 0 as a terminator of a type set
-
-REPL_OVERRIDE_MODE = False
 
 _BTypeByName = {}
 
@@ -130,32 +130,6 @@ def _updateFlagsForIntersection(t, flags, singleSV):
         flags.orthogonal = t
 
 
-class _AddStuff:
-    def __init__(self, t):
-        self.t = t
-    def __ror__(self, instance):    # instance | type
-        return instance | BTIntersection(instance._t if hasattr(instance, '_t') else builtins.type(instance), self.t)
-
-
-class _SubtractStuff:
-    def __init__(self, t):
-        self.t = t
-    def __ror__(self, instance):  # instance | type
-        if not isinstance(t := instance._t if hasattr(instance, '_t') else builtins.type(instance), BTIntersection):
-            raise BTypeError(f'Can only subtract a type from an intersection but LHS type is {t}')
-        a_, ab, b_, weakenings = _partitionIntersectionTLs(
-            t.types,
-            self.t.types if isinstance(self.t, BTIntersection) else (self.t, )
-        )
-        if b_:
-            raise BTypeError(f'RHS is trying to subtract {b_} which isn\'t in the LHS')
-        if not ab:
-            raise ProgrammerError(f'Can\'t end up subtracting nothing')
-        if not a_:
-            raise BTypeError('Left with null set')
-        return instance | (a_[0] if len(a_) == 1 else BTIntersection(*a_))
-
-
 def _anyHasT(*types):
     for t in types:
         if hasattr(t, 'hasT') and t.hasT:
@@ -194,21 +168,14 @@ O_O = 9
 SCHEMA_PENALTY = 0.5
 
 
-
 # dm should be independent of coppertop so any types needed in coppertop or bone should be created there
 # dm depends on coppertop which intern depends on bones which depends on jones
 # where do we define py?
 # bones has the function selection which uses py
 
 
-
-Fits = collections.namedtuple('Fits', ['fits', 'tByT', 'distance'])
-Fits.__bool__ = lambda self: self.fits
-
 IDENTICAL = Fits(True, {}, 0)
 DOES_NOT_FIT = Fits(False, Missing, Missing)    # or Fits(False, {}, 100000)?
-
-from bones.jones import BType as _JONES_BTYPE
 
 
 def _BTypeToPyBType(bt):
@@ -228,7 +195,11 @@ def fitsWithin(a, b, *, fittingSigs=False):
     if isinstance(a, type):
         if isinstance(b, BType):
             # most fitsWithin calls in coppertop will be Python type <: BType so this is the first case
-            cacheId = (a, b.id)
+            if b == pytype:
+                # any Python type <: pytype
+                return (Fits(True, {}, 0))
+            else:
+                cacheId = (a, b.id)
         elif isinstance(b, type):
             return IDENTICAL if a == b else DOES_NOT_FIT     # can Python's typing stuff be used here?
         else:
@@ -242,8 +213,13 @@ def fitsWithin(a, b, *, fittingSigs=False):
                 # generally `BType <: Python type` cannot be true, however, what about pydict <: dict, a A * B <: tuple
                 return DOES_NOT_FIT
         elif isinstance(b, BType):
-            if a.id == b.id: return IDENTICAL
-            cacheId = (a.id, b.id)
+            if b == btype:
+                # any BType <: btype but pydict <: pydict is exact
+                return Fits(True, {}, 0.25)
+            elif a.id == b.id:
+                return IDENTICAL
+            else:
+                cacheId = (a.id, b.id)
         else:
             raise TypeError('fitsWithin only supports Python types and BTypes')
         if a.hasT:
@@ -351,7 +327,9 @@ def _fitsWithin(a, b, fittingSigs=False):
                 return DOES_NOT_FIT
             schemaVars, _ = updateSchemaVarsWith(schemaVars, 0, fits)
             results.append(fits)
+        # OPEN: U_U_Metric
         return Fits(True, schemaVars, statistics.mean([r.distance for r in results]))
+        # return Fits(True, schemaVars, statistics.min([r.distance for r in results]))
 
     elif case == O_U:
         # a just needs to fit any element in b - select the closest match (for distance we could return mean but
@@ -537,14 +515,14 @@ def _fitsWithin(a, b, fittingSigs=False):
             # print(f'{a} <: {b} is true')
             return Fits(True, schemaVars, distance)
 
-        elif isinstance(a, BTOverload):
+        elif isinstance(a, BTFamily):
             # we don't do soft typing in coppertop
             return DOES_NOT_FIT
 
         else:
             return DOES_NOT_FIT
 
-    elif isinstance(a, BTOverload):
+    elif isinstance(a, BTFamily):
         if isinstance(b, BTFn):
             # must be a fit for one of a with b
             schemaVars, distance = {}, 0
@@ -556,7 +534,7 @@ def _fitsWithin(a, b, fittingSigs=False):
             else:
                 return DOES_NOT_FIT
 
-        elif isinstance(b, BTOverload):
+        elif isinstance(b, BTFamily):
             # a must fit with every one of b
             schemaVars, distance = {}, 0
             for bT in b.types:
@@ -648,6 +626,8 @@ def _THasTOther(t, acc):
         acc['otherHasT'] = acc['otherHasT'] or hasT(t)
     return acc
 
+
+_implicitTypes = ()
 def _anyNotImplicit(ts):
     for t in ts:
         if t not in _implicitTypes:
@@ -675,7 +655,7 @@ def _processA_(a_, schemaVars, lenWeakenings):
         try:
             tlid = sys._gtm.intersectionTlidFor(a_)
         except:
-            print('ponder some more')
+            print('ponder some more', file=sys.stderr)
             # raise BTypeError("OPEN: Needs description")
     return Fits(True, schemaVars, len(a_) + lenWeakenings)
 
@@ -740,17 +720,20 @@ def _partitionIntersectionTLs(A:tuple, B:tuple):
             oAB += 1
             iA += 1
             iB += 1
-            if oAB == nAB or iA == nA or iB == nB: break
+            if oAB == nAB or iA == nA or iB == nB:
+                break
         elif idA < idB:
             outA[oA] = tA
             oA += 1
             iA += 1
-            if oA == nA or iA == nA: break
+            if oA == nA or iA == nA:
+                break
         else:
             outB[oB] = tB
             oB += 1
             iB += 1
-            if oB == nB or iB == nB: break
+            if oB == nB or iB == nB:
+                break
     if (iA + 1) <= nA:
         for iA in range(iA, nA):
             outA[oA] = A[iA]
@@ -793,6 +776,9 @@ def _partitionIntersectionTLs(A:tuple, B:tuple):
     # answer  AB', AB, A'B
     return outA, outAB, outB, weakenings
 
+# every now and then we hack as a temporary measure - OPEN: needs doing properly
+bones.ts._type_lang.jones_type_manager._partitionIntersectionTLs = _partitionIntersectionTLs
+bones.ts._type_lang.jones_type_manager._BTypeToPyBType = _BTypeToPyBType
 
 def _partitionIntersectionTLsWithTInRhs(a:tuple, b:tuple, *, fittingSigs):
     ab = []
@@ -840,6 +826,25 @@ def hasT(t):
         raise ProgrammerError()
 
 
+def isT(x):
+    return isinstance(x, BTSchemaVariable) and x.hasT  # mildly faster than x.base is T
+
+
+def determineRetType(md, schemaVars, sigCaller):
+    raise NotYetImplemented()
+
+
+def _find(needle, haystack):
+    try:
+        return haystack.index(needle)
+    except:
+        return -1
+
+
+# **********************************************************************************************************************
+# essential btypes used throughout coppertop-bones
+# **********************************************************************************************************************
+
 T = BTSchemaVariable("T")
 
 _schemaVariablesByOrd = [Missing]
@@ -852,15 +857,9 @@ def schemaVariableForOrd(ord):
             _schemaVariablesByOrd[i] = BTSchemaVariable(f'T{i}')
     return _schemaVariablesByOrd[ord]
 
-
-def isT(x):
-    return isinstance(x, BTSchemaVariable) and x.hasT  # mildly faster than x.base is T
-
-
 for i in range(1, 10):
     Ti = schemaVariableForOrd(i)
     locals()[Ti.name] = Ti
-
 
 N = BTAtom('N')
 _ordinalTypes = [N]
@@ -870,18 +869,10 @@ for i in range(1, 10):
     _ordinalTypes.append(Ni)
     locals()[Ni.name] = Ni
 
-
 BType._arrayOrdinalTypes = tuple(_ordinalTypes)
 
+btype = BType('btype: atom in mem')     # a BType - OPEN: define in jones?
+pytype = BType('pytype: atom in mem')   # a Python type
+TBI = BType('TBI: atom in mem')         # To Be Inferred - OPEN: define in jones
 
-_implicitTypes = ()
-
-def _find(needle, haystack):
-    try:
-        return haystack.index(needle)
-    except:
-        return -1
-
-def determineRetType(md, schemaVars, sigCaller):
-    raise NotYetImplemented()
-
+_btypeByClass[builtins.type] = pytype   # needed to build @coppertop functions in coppertop.pipe which imports this module

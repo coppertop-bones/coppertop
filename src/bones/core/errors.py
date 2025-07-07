@@ -50,7 +50,7 @@ def _ensureErrors():
         class UnhappyWomble(CPTBError): pass
         sys._UnhappyWomble = UnhappyWomble
 
-    if not hasattr(sys, '_WTF'):        # polite interpretation of pls - What The Flip, What The Frac
+    if not hasattr(sys, '_WTF'):        # polite interpretation pls - What The Flip, What The Frac
         class WTF(CPTBError): pass
         sys._WTF = WTF
 
@@ -62,42 +62,6 @@ NotYetImplemented = sys._NotYetImplemented
 PathNotTested = sys._PathNotTested
 UnhappyWomble = sys._UnhappyWomble
 WTF = sys._WTF
-
-class DocumentationError(Exception): pass
-
-class BonesError(Exception):
-    def __init__(self, msg, errSite):
-        super().__init__(msg)
-        self._site = errSite
-        if (desc := handlersByErrSiteId.get(errSite.id, Missing)) is Missing:
-            print(f'Unknown ErrSiteId - {errSite.id}')
-            raise DocumentationError()
-        elif desc.endswith('...'):
-            pass
-            # print(f'{errSite.id} needs work:')
-            # print(desc)
-
-class SpellingError(BonesError): pass       # lex errors
-
-class GroupError(BonesError):               # grouping errors
-    def __init__(self, msg, errSite, group, token):
-        super().__init__(msg, errSite)
-        self._group = group
-        self._token = token
-
-class SentenceError(BonesError): pass       # phrase parsing errors
-
-class GrammarError(BonesError): pass        # for type errors
-
-class DictionaryError(BonesError): pass     # can't find a name in a phrase
-
-class AmbiguousVerbError(BonesError): pass  # aka does not understand, i.e. the necessary overload doesn't exist
-
-class LoadingError(BonesError): pass        # load tool.kit
-
-class ImportError(BonesError): pass         # e.g. from tools.bag import x - x doesn't exist
-
-class ScopeError(BonesError): pass          # e.g. trying to get from or set in the wrong scope
 
 
 
@@ -144,8 +108,8 @@ handlersByErrSiteId = {
 
     ('__main__', Missing, 'importStuff', "Can't find name") : '...',
 
-    ('bones.lang.parse_phrase', Missing, 'parsePhrase', 'unknown function') : '...',
-    ('bones.lang.parse_phrase', Missing, 'parsePhrase', 'unknown name') : '...',
-    ('bones.lang.parse_phrase', Missing, 'parsePhrase', 'name already defined'): '...',
+    ('bones.kernel.parse_phrase', Missing, 'parsePhrase', 'unknown function') : '...',
+    ('bones.kernel.parse_phrase', Missing, 'parsePhrase', 'unknown name') : '...',
+    ('bones.kernel.parse_phrase', Missing, 'parsePhrase', 'name already defined'): '...',
 
 }
