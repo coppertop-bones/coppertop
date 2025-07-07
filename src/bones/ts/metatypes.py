@@ -327,7 +327,9 @@ def _fitsWithin(a, b, fittingSigs=False):
                 return DOES_NOT_FIT
             schemaVars, _ = updateSchemaVarsWith(schemaVars, 0, fits)
             results.append(fits)
+        # OPEN: U_U_Metric
         return Fits(True, schemaVars, statistics.mean([r.distance for r in results]))
+        # return Fits(True, schemaVars, statistics.min([r.distance for r in results]))
 
     elif case == O_U:
         # a just needs to fit any element in b - select the closest match (for distance we could return mean but
