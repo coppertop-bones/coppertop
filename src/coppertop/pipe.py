@@ -258,8 +258,8 @@ def _tArgFromAnnotation(annotation, modname, fnnameForErr, msgForErr):
 # **********************************************************************************************************************
 
 def _coppertopImportFn(name, globals=None, locals=None, fromlist=(), level=0):
-    if not fromlist or not name or not globals: return sys._preCoppertopImportFn(name, globals, locals, fromlist, level)
     mod = sys._preCoppertopImportFn(name, globals, locals, fromlist, level)
+    if not fromlist or not name or not globals: return mod
     if fromlist == ('*',):
         if (namesToImport := getattr(mod, '__all__', Missing)) is Missing:
             namesToImport = sorted([k for k in mod.__dict__.keys() if not k.startswith('__')])
