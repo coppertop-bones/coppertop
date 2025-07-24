@@ -20,13 +20,13 @@ __all__ = [
     'tup', 'struct', 'frame',
     'litint', 'litnum', 'littxt', 'litsym', 'litsyms', 'litdate', 'litframe', 'littup', 'litstruct',
     'T', 'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9',
-    '_tv', '_tvfunc',
+    '_tv', 'tvfunc',
     'btype', 'pytype',
 ]
 
 from bones.core.sentinels import Null, Void, Missing
 from bones.ts.metatypes import BTAtom, BType, extractConstructors, BTFn, BTTuple
-from bones.ts.select import TBI, _tvfunc, btype, pytype
+from bones.ts.select import TBI, tvfunc, btype, pytype
 
 
 
@@ -194,10 +194,6 @@ litdate = BTAtom('litdate', space=mem)
 
 # OPEN: need litdatetime, litcitydatetime etc
 
-
-__all__ += [
-    'btype'
-]
 
 
 T = BType('T')

@@ -41,7 +41,7 @@ SHOW_ARGNAMES = True
 # function struct
 # **********************************************************************************************************************
 
-class _tvfunc(jones.JFunc):
+class tvfunc(jones.JFunc):
     # __slots__ = []      # don't allow any additional attributes to be added to this class
 
     def __init__(self, *, name, modname, style, _v, dispatchEvenIfAllTypes, typeHelper, _t, argNames, pass_tByT):
@@ -62,8 +62,8 @@ class _tvfunc(jones.JFunc):
             self.typeHelper = typeHelper
         self.__doc__ = _v.__doc__ if hasattr(_v, '__doc__') else None
 
-    # def __call__(self, *args):
-    #     implemented in C
+    # def __call__(self, *args, **kwargs):
+    #     return super().__call__(*args, **kwargs)  # implemented in C
 
     @property
     def fullname(self):
@@ -87,10 +87,10 @@ class _tvfunc(jones.JFunc):
 
 
 # **********************************************************************************************************************
-# Overload
+# tvoverload
 # **********************************************************************************************************************
 
-class Overload(jones.JOverload):
+class tvoverload(jones.JOverload):
     # limited dictionary style interface object that stores tvfunc by sig for a given name and number of args
 
     __slots__ = ['_fnsTBI', '_t_', '_tUpperBounds_', 'cache']
@@ -110,36 +110,37 @@ class Overload(jones.JOverload):
 
     def __new__(self):
         # OPEN: maybe provide a constructor that takes two or more tvfuncs
-        raise ProgrammerError("Overload cannot be constructed directly - use Overload.newForMutation(...)")
+        raise ProgrammerError("tvoverload cannot be constructed directly - use tvoverload.newForMutation(...)")
 
     # def __call__(self, *args):
-    #     implemented in C
+    #     return super().__call__(*args)   # implemented in C
 
     @property
     def _t(self):
         if self._t_ is Missing:
-            self._t_ = BTFamily(*[fn._t for fn in self._tvfuncBySig.values()])      # OPEN: do we need BTOverload?
+            self._t_ = BTFamily(*[tvfn._t for tvfn in self._tvfuncBySig.values()])      # OPEN: do we need BTOverload?
         return self._t_
 
-    def __setitem__(self, sig, tvfunc):
-        if tvfunc.numargs != self.numargs: raise ProgrammerError()
+    def __setitem__(self, sig, tvfn):
+        assert isinstance(sig, tuple)
+        if tvfn.numargs != self.numargs: raise ProgrammerError()
         self._t_ = Missing
         self._tUpperBounds_ = Missing
         needsInferring = False
-        for tArg in tvfunc.tArgs:
+        for tArg in tvfn.tArgs:
             if tArg == TBI:
                 needsInferring = True
                 break
-        if tvfunc.tRet == TBI:
+        if tvfn.tRet == TBI:
             needsInferring = True
         if needsInferring:
             # if any arg needs to be inferred then it cannot be added to the overload yet and that can only be done
             # post inference so let's try queuing it?
-            self._fnsTBI << tvfunc
+            self._fnsTBI << tvfn
         else:
-            if tvfunc in self._fnsTBI:
-                self._fnsTBI.remove(tvfunc)
-            self._tvfuncBySig[sig] = tvfunc
+            if tvfn in self._fnsTBI:
+                self._fnsTBI.remove(tvfn)
+            self._tvfuncBySig[sig] = tvfn
 
     def __getitem__(self, sig):
         return self._tvfuncBySig[sig]
@@ -169,12 +170,12 @@ class Overload(jones.JOverload):
                     # collate the types for each arg
                     for i in range(self.numargs):
                         tArgsN = []
-                        for tvfunc in self._fnsTBI:
-                            tArgsN.append(tvfunc.tArgs.types[i])
+                        for tvfn in self._fnsTBI:
+                            tArgsN.append(tvfn.tArgs.types[i])
                         tArgs.append(BTUnion(*tArgsN) if len(tArgsN) != 1 else tArgsN[0])
                     # collate the tRets
-                    for tvfunc in self._fnsTBI:
-                        tRets.append(tvfunc.tRet)
+                    for tvfn in self._fnsTBI:
+                        tRets.append(tvfn.tRet)
                     tRet = BTUnion(*tRets) if len(tRets) > 1 else tRets[0]
                     ppT = repr(BTFn(tArgs, tRet))
                 except:
@@ -185,7 +186,7 @@ class Overload(jones.JOverload):
     def selectFunction(self, *args):
         # OPEN: implement in C
         if self.numargs == 0:
-            tvfunc = self._tvfuncBySig[()]
+            tvfn = self._tvfuncBySig[()]
             tByT = {}
             hasValue = True
         else:
@@ -204,23 +205,23 @@ class Overload(jones.JOverload):
 
             if resultId == 0:
                 tArgs = jones.sc_tArgsFromQuery(pSC, _BTypeById)
-                tvfunc, tByT, distance, argDistances = self._selectFunction(tArgs)
-                results.append((tvfunc, tByT))
+                tvfn, tByT, distance, argDistances = self._selectFunction(tArgs)
+                results.append((tvfn, tByT))
                 pQuery = jones.sc_queryPtr(pSC)
                 iNext = jones.sc_nextFreeArrayIndex(pSC)
                 if iNext == 0:
                     raise RuntimeError("Array not big enough")
                 jones.sc_atArrayPut(pSC, iNext, pQuery, len(results))
             else:
-                tvfunc, tByT = results[resultId - 1]
-        return tvfunc, tByT, hasValue
+                tvfn, tByT = results[resultId - 1]
+        return tvfn, tByT, hasValue
 
     def _selectFunction(self, callerSig):
         # OPEN: implement this section in C
         fallbacks, matches = [], []
         # search though each function in _tvfuncBySig recording catchAll matches separately from actual matches
         distance = 10000
-        for fnSig, fn in self._tvfuncBySig.items():
+        for fnSig, tvfn in self._tvfuncBySig.items():
             distance = 10000
             actual = match, fallback, schemaVars, argDistances = jones._distancesEtAl(callerSig, fnSig)
             expected = _distancesEtAl(callerSig, fnSig)
@@ -228,13 +229,13 @@ class Overload(jones.JOverload):
             if match:
                 distance = sum(argDistances)
                 if fallback:
-                    fallbacks.append((fn, schemaVars, distance, argDistances))
+                    fallbacks.append((tvfn, schemaVars, distance, argDistances))
                 else:
-                    matches.append((fn, schemaVars, distance, argDistances))
+                    matches.append((tvfn, schemaVars, distance, argDistances))
             if distance == 0:
                 # OPEN: instead of escaping at first match complete the search and provide and early warning of
                 # potential conflicts (i.e. fns that have the same distance to the signature)
-                return fn, schemaVars, distance, argDistances
+                return tvfn, schemaVars, distance, argDistances
 
         # OPEN: implement the distance metric based selection in C but allow a Python callback since the distance
         # metric is not yet community proven and may change, e.g. sum(argDistances) is effectively L1, could do L2 or
@@ -251,8 +252,8 @@ class Overload(jones.JOverload):
                 with context(showFullType=True):
                     caller = _ppCall(self.name, callerSig)
                     context.EE(f'1. {caller} fitsWithin:')
-                    for fn, tByT, distance, argDistances in matches:
-                        callee = f'{fn.ppSig()}) (argDistances: {argDistances}) - {fn.fullname} defined in {fn.modname}'
+                    for tvfn, tByT, distance, argDistances in matches:
+                        callee = f'{tvfn.ppSig()}) (argDistances: {argDistances}) - {tvfn.fullname} defined in {tvfn.modname}'
                         context.EE(f'  {callee}')
                 raiseLess(TypeError(f'Found {len(matches)} matches and {len(fallbacks)} fallbacks for {caller}', ErrSite("#2")))
         elif len(fallbacks) == 1:
@@ -267,8 +268,8 @@ class Overload(jones.JOverload):
                 with context(showFullType=True):
                     caller = _ppCall(self.name, callerSig)
                     context.EE(f'2. {caller} fitsWithin:')
-                    for fn, tByT, distance, argDistances in matches:
-                        callee = f'{fn.ppSig()}) (argDistances: {argDistances}) - {fn.fullname} defined in {fn.modname}'
+                    for tvfn, tByT, distance, argDistances in matches:
+                        callee = f'{tvfn.ppSig()}) (argDistances: {argDistances}) - {tvfn.fullname} defined in {tvfn.modname}'
                         context.EE(f'  {callee}')
                 raiseLess(TypeError(f'Found {len(matches)} matches and {len(fallbacks)} fallbacks for {caller}', ErrSite("#3")))
         else:
@@ -276,18 +277,18 @@ class Overload(jones.JOverload):
             with context(showFullType=True):
                 caller = _ppCall(self.name, callerSig)
                 context.EE(f'No matches for {caller} in:')
-                for sig, fn in self._tvfuncBySig.items():
-                    callee = f'{fn.ppSig()} - {fn.fullname} defined in {fn.modname}'
+                for sig, tvfn in self._tvfuncBySig.items():
+                    callee = f'{tvfn.ppSig()} - {tvfn.fullname} defined in {tvfn.modname}'
                     context.EE(f'  {callee}')
             raiseLess(BTypeError(f'No matches for {caller}'), ErrSite("#1"))
 
 
 
 # **********************************************************************************************************************
-# Family
+# tvfamily
 # **********************************************************************************************************************
 
-class Family(jones.JFamily):
+class tvfamily(jones.JFamily):
 
     __slots__ = ['style', '_t', '_doc']
 
@@ -312,45 +313,45 @@ class Family(jones.JFamily):
         for arg in args:
             if not arg: continue
             if name is Missing: name, style = arg.name, arg.style
-            if isinstance(arg, Family):
+            if isinstance(arg, tvfamily):
                 for overload in arg._overloadByNumArgs:
-                    for _, tvfunc in overload.items():
-                        if isinstance(tvfunc, _tvfunc):
-                            cls._checkTvfunc(tvfunc, name, style)
-                            tvfuncs.append(tvfunc)
+                    for _, tvfn in overload.items():
+                        if isinstance(tvfn, tvfunc):
+                            cls._checkTvfunc(tvfn, name, style)
+                            tvfuncs.append(tvfn)
                         else:
                             raiseLess(ProgrammerError("unknown dispatcher class", ErrSite(cls, "#5")))
                 if len(arg._overloadByNumArgs) > maxNumArgs: maxNumArgs = len(arg._overloadByNumArgs) - 1  # don't forget 0 args
-            elif isinstance(arg, _tvfunc):
+            elif isinstance(arg, tvfunc):
                 cls._checkTvfunc(arg, name, style)
                 if len(arg.sig) > maxNumArgs: maxNumArgs = len(arg.sig)
                 tvfuncs.append(arg)
             else:
                 raiseLess(ProgrammerError("unhandled dispatcher class", ErrSite(cls, "#11")))
 
-        _overloadByNumArgs = [Overload.newForMutation(name, numargs) for numargs in range(maxNumArgs + 1)]
-        for tvfunc in tvfuncs:
-            # oldD = _overloadByNumArgs[len(tvfunc.sig)].get(tvfunc.sig, Missing)
-            # if oldD is not Missing and oldD.modname != tvfunc.modname:
-            #     raise CoppertopError(f'Found definition of {_ppFn(name, tvfunc.sig)} in "{tvfunc.modname}" and "{oldD.modname}"', ErrSite(cls, "#12"))
-            _overloadByNumArgs[len(tvfunc.sig)][tvfunc.sig] = tvfunc
+        _overloadByNumArgs = [tvoverload.newForMutation(name, numargs) for numargs in range(maxNumArgs + 1)]
+        for tvfn in tvfuncs:
+            # oldD = _overloadByNumArgs[len(tvfn.sig)].get(tvfn.sig, Missing)
+            # if oldD is not Missing and oldD.modname != tvfn.modname:
+            #     raise CoppertopError(f'Found definition of {_ppFn(name, tvfn.sig)} in "{tvfn.modname}" and "{oldD.modname}"', ErrSite(cls, "#12"))
+            _overloadByNumArgs[len(tvfn.sig)][tvfn.sig] = tvfn
         # if len(_overloadByNumArgs) == 1 and len(_overloadByNumArgs[0]) == 1:
         #     # this can occur in a REPL where a function is being redefined
         #     # SHOULDDO think this through as potentially we could overload functions in the repl accidentally which
         #     #  would be profoundly confusing
-        #     return tvfunc
+        #     return tvfn
         instance = super().__new__(cls)
         instance.name = name
         instance.style = style
         instance._overloadByNumArgs = _overloadByNumArgs
         ts = []
         for overload in _overloadByNumArgs:
-            for sig, fn in overload.items():
-                ts.append(fn._t)
+            for sig, tvfn in overload.items():
+                ts.append(tvfn._t)
         if ts:
             instance._t = BTFamily(*ts)
         else:
-            instance._t = Missing    # Empty Family is being constructed
+            instance._t = Missing    # Empty tvfamily is being constructed
         instance._doc = None
         return instance
 
@@ -359,18 +360,18 @@ class Family(jones.JFamily):
 
     def getOverload(self, numargs):
         if numargs >= len(self._overloadByNumArgs):
-            self._overloadByNumArgs = self._overloadByNumArgs + [Overload.newForMutation(self.name, numargs) for numargs in range(len(self._overloadByNumArgs), numargs + 1)]
+            self._overloadByNumArgs = self._overloadByNumArgs + [tvoverload.newForMutation(self.name, numargs) for numargs in range(len(self._overloadByNumArgs), numargs + 1)]
         return self._overloadByNumArgs[numargs]
 
     def _tPartial(self, num_args, o_tbc):
         # if this is a bottleneck cache it with an invalidation mechanism if an underlying overload changes
         ts = []
-        for sig, tvfunc in self._overloadByNumArgs[num_args].items():
-            ts.append(tvfunc._tPartial(o_tbc))
+        for sig, tvfn in self._overloadByNumArgs[num_args].items():
+            ts.append(tvfn._tPartial(o_tbc))
         return BTFamily(*ts)
 
     def __repr__(self):
-        return f'{self.name} Family'
+        return f'{self.name} tvfamily'
 
     @property
     def __doc__(self):
@@ -380,14 +381,14 @@ class Family(jones.JFamily):
             return 'NotYetImplemented - this should return a docstring for all the overloads in the family.'
 
     @classmethod
-    def _checkTvfunc(cls, tvfunc, name, style):
-        if tvfunc.name != name:
+    def _checkTvfunc(cls, tvfn, name, style):
+        if tvfn.name != name:
             raiseLess(ProgrammerError(
-                f'Incompatible name - trying to add function "{tvfunc.name}" to overload "{name}"',
+                f'Incompatible name - trying to add function "{tvfn.name}" to overload "{name}"',
                 ErrSite(cls, "#1")))
-        if tvfunc.style != style:
+        if tvfn.style != style:
             raiseLess(ProgrammerError(
-                f'Incompatible style - trying to overload {tvfunc.style} function "{tvfunc.name}" with existing {style} function "{name}"',
+                f'Incompatible style - trying to overload {tvfn.style} function "{tvfn.name}" with existing {style} function "{name}"',
                 ErrSite(cls, "#10")))
 
 
@@ -400,13 +401,13 @@ def ppSig(x):
     if isinstance(x, function):
         return f'{x.__name__} is a Python function'
     x = x.d
-    if isinstance(x, Family):
+    if isinstance(x, tvfamily):
         answer = []
         for overload in x._overloadByNumArgs:
-            for sig, tvfunc in overload.items():
+            for sig, tvfn in overload.items():
                 argTs = [_ppType(argT) for argT in sig]
-                retT = _ppType(tvfunc.tRet)
-                answer.append(f'({",".join(argTs)})->{retT} <{tvfunc.style.name}>  :   in {tvfunc.fullname}')
+                retT = _ppType(tvfn.tRet)
+                answer.append(f'({",".join(argTs)})->{retT} <{tvfn.style.name}>  :   in {tvfn.fullname}')
         return answer
     else:
         argTs = [_ppType(argT) for argT in x.sig]
@@ -455,18 +456,18 @@ def _typeOf(x) -> pytype + btype:
             t = builtins.type(x._target)    # return the type of thing being proxied
         return _btypeByClass.get(t, t)      # type python types as their bones equivalent
 
-def _tvfuncErrorCallback1(ex, tvfunc):
+def _tvfuncErrorCallback1(ex, tvfn):
     if ex.args and ' required positional argument' in ex.args[0]:
         # instead of TypeError: createHelper() missing 1 required positional argument: 'otherHandSizesById'
         # print out the signature and provided args
-        print(ppSig(tvfunc), file=sys.stderr)
+        print(ppSig(tvfn), file=sys.stderr)
         print(ex.args[0], file=sys.stderr)
     # raise ex from ex
     # raiseLess(ex, True)
 
-def _tvfuncErrorCallback2(tvfunc, ret):
+def _tvfuncErrorCallback2(tvfn, ret):
     raiseLess(BTypeError(
-        f'{tvfunc.fullname} returned a {str(_typeOf(ret))} should have have returned a {tvfunc.tRet} {tvfunc.tByT}',
+        f'{tvfn.fullname} returned a {str(_typeOf(ret))} should have have returned a {tvfn.tRet} {tvfn.tByT}',
         ErrSite("#1")
     ))
 

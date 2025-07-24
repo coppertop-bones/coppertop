@@ -72,8 +72,8 @@ from bones.core.errors import ErrSite, CPTBError
 from bones.core.sentinels import Missing
 from bones.core.utils import raiseLess
 from bones.ts.metatypes import BType, fitsWithin as origFitsWithin, BTFn, BTTuple, BTAtom, _btypeByClass
-from bones.lang.types import nullary, unary, binary, ternary, _tvfunc, btype, pytype
-from bones.ts.select import Family, ppSig
+from bones.lang.types import nullary, unary, binary, ternary, btype, pytype
+from bones.ts.select import tvfamily, ppSig, tvfunc
 
 
 _py = BType('py: atom in mem')
@@ -108,7 +108,7 @@ def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEv
         style_ = unary if style is Missing else style
         modname, fnname, pymodFn, enclosingFnName, argNames, sig, tRet, pass_tByT = _fnContext(pyfn, 'registerFn', name)
 
-        fn = _tvfunc(
+        tvfn = tvfunc(
             name=fnname, modname=modname, style=style_, _v=pyfn, dispatchEvenIfAllTypes=dispatchEvenIfAllTypes,
             typeHelper=typeHelper, _t=BTFn(sig, tRet), argNames=argNames, pass_tByT=pass_tByT
         )
@@ -129,14 +129,14 @@ def coppertop(*args, style=Missing, name=Missing, typeHelper=Missing, dispatchEv
             return bf
         if enclosingFnName:
             if pymodFn is Missing:
-                return _jonesFnByStyle[style_](fnname, modname + '.' + enclosingFnName, Family(fn), _UNDERSCORE)
+                return _jonesFnByStyle[style_](fnname, modname + '.' + enclosingFnName, tvfamily(tvfn), _UNDERSCORE)
             else:
-                return _jonesFnByStyle[style_](fnname, modname + '.' + enclosingFnName, Family(pymodFn.d, fn), _UNDERSCORE)
+                return _jonesFnByStyle[style_](fnname, modname + '.' + enclosingFnName, tvfamily(pymodFn.d, tvfn), _UNDERSCORE)
         else:
             if pymodFn is Missing:
-                return _jonesFnByStyle[style_](fnname, modname, Family(fn), _UNDERSCORE)
+                return _jonesFnByStyle[style_](fnname, modname, tvfamily(tvfn), _UNDERSCORE)
             else:
-                return _jonesFnByStyle[style_](fnname, modname, Family(pymodFn.d, fn), _UNDERSCORE)
+                return _jonesFnByStyle[style_](fnname, modname, tvfamily(pymodFn.d, tvfn), _UNDERSCORE)
 
 
     if len(args) == 1 and isinstance(args[0], (types.FunctionType, types.MethodType, builtins.type)):
@@ -279,7 +279,7 @@ def _coppertopImportFn(name, globals=None, locals=None, fromlist=(), level=0):
             dummyMod.__dict__[n] = getattr(mod, n)
         modName = globals.get("__name__", "????")
         for n, (current, new) in namesToOverloaded.items():
-            dummyMod.__dict__[n] = current.__class__(n, modName, Family(current.d, new.d), _UNDERSCORE)
+            dummyMod.__dict__[n] = current.__class__(n, modName, tvfamily(current.d, new.d), _UNDERSCORE)
         if context.LogWhenOverloading:
             s = "', '"
             msg = f'overloaded \'{s.join(namesToOverloaded.keys())}\' whilst importing from {name} into {globals.get("__name__", "????")}'
@@ -316,11 +316,11 @@ def makeFn(*args):
     modname, fnname, _, _, argNames, _, _, pass_tByT = _fnContext(pyfn, 'anon', name)
     if _t is Missing:
         _t = BTFn(BTTuple(*[_py] * len(argNames)), _py)
-    tvfunc = _tvfunc(
+    tvfn = tvfunc(
         name=fnname, modname=modname, style=unary, _v=pyfn, dispatchEvenIfAllTypes=False,
         typeHelper=Missing, _t=_t, argNames=argNames, pass_tByT=False
     )
-    return jones._unary(fnname, modname, Family(tvfunc), _UNDERSCORE)
+    return jones._unary(fnname, modname, tvfamily(tvfn), _UNDERSCORE)
 
 @coppertop
 def sig(x):

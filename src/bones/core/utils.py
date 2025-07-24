@@ -71,7 +71,6 @@ def firstValue(d):
     raise ProgrammerError(f'd is empty')
 
 
-
 @contextlib.contextmanager
 def HookStdOutErrToLines():
     oldout, olderr = sys.stdout, sys.stderr
@@ -95,3 +94,12 @@ class _StreamToLines:
                 self.lines.append(self.textBuffer)
                 self.textBuffer = ""
             self.textBuffer += splits[-1:][0]
+
+
+class assertIs:
+    def __init__(self, type):
+        self.type = type
+    def __rrshift__(self, lhs):     # lhs >> self
+        assert isinstance(lhs, self.type)
+        return lhs
+
