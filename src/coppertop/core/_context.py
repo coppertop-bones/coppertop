@@ -11,8 +11,8 @@ import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 from contextlib import contextmanager as _contextmanager
-from bones.core.sentinels import Missing
-from bones.core.errors import ProgrammerError
+from coppertop.core._sentinels import Missing
+from coppertop.core._errors import ProgrammerError
 
 if not hasattr(sys, '_ContextStack'):
     sys._ContextStack = {}

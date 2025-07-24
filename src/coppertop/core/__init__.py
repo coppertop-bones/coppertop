@@ -10,6 +10,19 @@
 import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
-from bones.core.context import context
-from bones.core.sentinels import Missing, Null, Err, Void, EarlyExit
-from bones.core.errors import ProgrammerError, CPTBError, NotYetImplemented, PathNotTested, UnhappyWomble, WTF
+from coppertop.core._context import context
+from coppertop.core._sentinels import Missing, Null, Err, Void, EarlyExit
+from coppertop.core._errors import (ProgrammerError, CPTBError, NotYetImplemented, PathNotTested, UnhappyWomble, WTF,
+    ErrSite, handlersByErrSiteId)
+from coppertop.core._utils import raiseLess, assertIs, firstValue, firstKey, HookStdOutErrToLines
+
+ellipsis = type(...)
+dict_keys = type({}.keys())
+dict_values = type({}.values())
+dict_items = type({}.items())
+# function = type(lambda x:x)
+int = type(1)
+str = type('hello')
+bool = type(True)
+list_iter = type(iter([]))
+generator = type((x for x in []))

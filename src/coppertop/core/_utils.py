@@ -10,8 +10,8 @@
 import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
-import inspect, types, traceback, contextlib
-from bones.core.errors import ProgrammerError
+import inspect, types, contextlib
+from coppertop.core import ProgrammerError
 
 ignore = [
     'IPython', 'ipykernel', 'pydevd', 'coppertop.pipe', '_pydev_imps._pydev_execfile', 'tornado', 'runpy', 'asyncio',

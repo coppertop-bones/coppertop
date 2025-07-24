@@ -9,8 +9,7 @@
 
 import collections
 
-from bones.core.sentinels import Missing
-from bones.core.errors import NotYetImplemented
+from coppertop.core import Missing, NotYetImplemented
 
 
 

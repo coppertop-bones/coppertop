@@ -17,8 +17,7 @@
 
 import antlr4
 
-from bones.core.sentinels import Missing
-from bones.core.errors import ProgrammerError, NotYetImplemented
+from coppertop.core import Missing, ProgrammerError, NotYetImplemented
 
 from bones.ts._type_lang.utils import ctxLabel
 from bones.ts._type_lang.ast_nodes import SrcLoc, BindNode, MutableNode, AtomNode, CheckImplicitTbcsAreConfirmedNode, \

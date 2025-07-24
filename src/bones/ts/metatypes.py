@@ -23,6 +23,7 @@ if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 __all__ = ['BType', 'BTypeError', 'SchemaError', 'extractConstructors']
 
 import itertools, builtins, collections, statistics
+from coppertop.core import ProgrammerError, NotYetImplemented, PathNotTested, Missing
 
 from bones.jones import Fits, SchemaError
 import bones.ts._type_lang.jones_type_manager
@@ -34,8 +35,6 @@ from bones.ts.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec
 from bones.ts._type_lang.jones_type_manager import _btypeByClass, _BTypeById     # used by coppertop.pipe - do not remove
 from bones.ts.type_lang import TypeLangInterpreter
 
-from bones.core.errors import ProgrammerError, NotYetImplemented, PathNotTested
-from bones.core.sentinels import Missing
 
 
 _verboseNames = False

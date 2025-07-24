@@ -8,13 +8,11 @@
 # **********************************************************************************************************************
 
 import collections, itertools
+from coppertop.core import Missing, context, ProgrammerError, NotYetImplemented
 
 from bones.ts.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, bmtsvr
 
 from bones.jones import BTypeError
-from bones.core.sentinels import Missing
-from bones.core.context import context              # needed for conditional break points whilst debugging
-from bones.core.errors import ProgrammerError, NotYetImplemented
 from bones.ts._type_lang.utils import OnErrorRollback
 from bones.ts._type_lang.fits import fitsWithin
 

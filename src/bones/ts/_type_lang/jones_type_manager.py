@@ -11,19 +11,14 @@ import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 import builtins
+from coppertop.core import ErrSite, context, ProgrammerError, NotYetImplemented, Missing, raiseLess, firstValue
 
-from bones.core.errors import NotYetImplemented
-from bones.core.sentinels import Missing
 from bones import jones
 from bones.jones import BTypeError, BType as BTypeRoot
 from bones.ts.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, bmtsvr, \
     Constructors, TLError
 from bones.ts._type_lang.utils import OnErrorRollback
 from bones.ts._type_lang.fits import fitsWithin
-from bones.core.errors import ProgrammerError, NotYetImplemented, PathNotTested
-from bones.core.utils import raiseLess, firstValue
-from bones.core.errors import ErrSite
-from bones.core.context import context
 from bones.ts.type_lang import TypeLangInterpreter
 
 

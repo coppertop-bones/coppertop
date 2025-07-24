@@ -12,7 +12,7 @@ if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 import inspect
 
-from bones.core.sentinels import Missing, classType
+from coppertop.core._sentinels import Missing
 
 handlersByErrSiteId = {}
 
@@ -81,16 +81,16 @@ class ErrSite:
             pass
         elif len(args) == 1:
             # id or class
-            if isinstance(args[0], classType):
+            if isinstance(args[0], type):
                 self._className = args[0].__name__
             else:
                 self._label = args[0]
         elif len(args) == 2:
             # class, id
-            if isinstance(args[0], classType):
+            if isinstance(args[0], type):
                 self._className = args[0].__name__
                 self._label = args[1]
-            elif isinstance(args[1], classType):
+            elif isinstance(args[1], type):
                 self._label = args[0]
                 self._className = args[1].__name__
         else:

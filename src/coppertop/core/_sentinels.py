@@ -12,7 +12,6 @@ import sys, types, typing
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 
-
 __all__ = ['Missing', 'Null', 'Void', 'Err', 'EarlyExit']
 
 
@@ -112,18 +111,6 @@ Null = sys._NULL
 Err = sys._ERR
 Void = sys._VOID
 EarlyExit = sys._ExitEarly
-
-ellipsis = type(...)
-dict_keys = type({}.keys())
-dict_values = type({}.values())
-dict_items = type({}.items())
-function = type(lambda x:x)
-int = type(1)
-str = type('hello')
-bool = type(True)
-classType = type(object)
-list_iter = type(iter([]))
-generator = type((x for x in []))
 
 
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__ + ' - done')

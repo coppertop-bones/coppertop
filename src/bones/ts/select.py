@@ -8,18 +8,16 @@
 # **********************************************************************************************************************
 
 import sys
+
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
-import builtins
+import builtins, types
+from coppertop.core import context, Missing, ProgrammerError, ErrSite, raiseLess, firstValue
 
 from bones import jones
-from bones.core.context import context
-from bones.core.sentinels import Missing, function
-from bones.core.errors import ProgrammerError, ErrSite, NotYetImplemented
 from bones.ts.metatypes import updateSchemaVarsWith, fitsWithin, BTFamily, BType, _btypeByClass, _BTypeById, BTUnion, \
     BTFn, BTTuple, btype, pytype, TBI
 from bones.ts.core import SchemaError, BTypeError
-from bones.core.utils import raiseLess, firstValue
 from bones.ts import metatypes
 
 from coppertop._scopes import _CoWProxy
@@ -398,7 +396,7 @@ class tvfamily(jones.JFamily):
 # **********************************************************************************************************************
 
 def ppSig(x):
-    if isinstance(x, function):
+    if isinstance(x, types.FunctionType):
         return f'{x.__name__} is a Python function'
     x = x.d
     if isinstance(x, tvfamily):

@@ -24,7 +24,7 @@ __all__ = [
     'btype', 'pytype',
 ]
 
-from bones.core.sentinels import Null, Void, Missing
+from coppertop.core import Null, Void, Missing
 from bones.ts.metatypes import BTAtom, BType, extractConstructors, BTFn, BTTuple
 from bones.ts.select import TBI, tvfunc, btype, pytype
 
@@ -87,7 +87,7 @@ unary = BTAtom("unary")
 binary = BTAtom("binary")
 ternary = BTAtom("ternary")
 
-void = BTAtom('void', space=mem)        # something that isn't there and shouldn't be there
+void = BType('void: atom in mem')       # something that isn't there and shouldn't be there
 null = BTAtom('null')                   # the null set - something that isn't there and that's okay
 missing = BTAtom('missing')             # something that isn't there but should be - considered an error
 
@@ -123,6 +123,7 @@ class _litint(int):
     @property
     def _t(self):
         return litint
+    @property
     def _v(self):
         return self
     def __repr__(self):
@@ -141,6 +142,7 @@ class _litnum(float):
     @property
     def _t(self):
         return litnum
+    @property
     def _v(self):
         return self
     def __repr__(self):
@@ -182,15 +184,15 @@ def _litsymCons(cls, *args, **kwargs):
         return _tv(litsym, v)
     else:
         raise SyntaxError(f'No args passed')
-litsym = BTAtom('litsym', space=mem).setConstructor(_litsymCons)
-litsyms = BTAtom('litsyms', space=mem)   # OPEN: needs constructor
+litsym = BType('litsym: atom in mem').setConstructor(_litsymCons)
+litsyms = BType('litsyms: atom in mem')   # OPEN: needs constructor
 
 
 # the structures for littup, litstruct and litframe are provided by libraries to be constructed by the kernel
 littup = BType('littup: littup & tup in mem')
 litstruct = BType('litstruct: litstruct & struct in mem')
 litframe = BType('litframe: litframe & frame in mem')
-litdate = BTAtom('litdate', space=mem)
+litdate = BType('litdate: atom in mem')
 
 # OPEN: need litdatetime, litcitydatetime etc
 

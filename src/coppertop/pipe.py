@@ -66,11 +66,9 @@ import coppertop as coppertopMod
 coppertopMod.__version__ = "2025.07.05.1"
 from bones import jones
 
-from bones.core.context import context
 from coppertop._scopes import _UNDERSCORE
-from bones.core.errors import ErrSite, CPTBError
-from bones.core.sentinels import Missing
-from bones.core.utils import raiseLess
+from coppertop.core import ErrSite, CPTBError, Missing, context, raiseLess
+
 from bones.ts.metatypes import BType, fitsWithin as origFitsWithin, BTFn, BTTuple, BTAtom, _btypeByClass
 from bones.lang.types import nullary, unary, binary, ternary, btype, pytype
 from bones.ts.select import tvfamily, ppSig, tvfunc

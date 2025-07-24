@@ -13,8 +13,7 @@ if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 import copy
 from ctypes import c_long
-from bones.core.errors import ProgrammerError, NotYetImplemented
-from bones.core.sentinels import Missing
+from coppertop.core import ProgrammerError, NotYetImplemented, Missing
 
 _from_address = c_long.from_address
 _numCopies = 0

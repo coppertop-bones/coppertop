@@ -7,8 +7,7 @@
 # License. See the NOTICE file distributed with this work for additional information regarding copyright ownership.
 # **********************************************************************************************************************
 
-from bones.core.sentinels import Missing
-from bones.core.errors import ProgrammerError
+from coppertop.core import Missing, ProgrammerError
 from bones.ts.core import bmtnul
 
 
