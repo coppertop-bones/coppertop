@@ -9,7 +9,7 @@
 
 import collections
 
-from coppertop.core import Missing, NotYetImplemented
+from coppertop.utils import Missing, NotYetImplemented
 
 
 

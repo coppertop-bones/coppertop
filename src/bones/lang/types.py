@@ -24,8 +24,8 @@ __all__ = [
     'btype', 'pytype',
 ]
 
-from coppertop.core import Null, Void, Missing
-from bones.ts.metatypes import BTAtom, BType, extractConstructors, BTFn, BTTuple
+from coppertop.utils import Null, Void, Missing, NotYetImplemented
+from bones.ts.metatypes import BTAtom, BType, extractConstructors
 from bones.ts.select import TBI, tvfunc, btype, pytype
 
 
@@ -37,8 +37,10 @@ from bones.ts.select import TBI, tvfunc, btype, pytype
 class _tv:
     __slots__ = ['_t', '_v', '_hash']
     def __new__(cls, *args_, **kwargs_):
-        constr, args, kwargs = extractConstructors(args_, kwargs_)
-        if constr:
+        constrs, args, kwargs = extractConstructors(args_, kwargs_)
+        if constrs:
+            if len(constrs) != 1: raise NotYetImplemented()
+            constr = constrs[0]
             assert isinstance(constr, (BType, type))
             instance = super(cls, cls).__new__(cls)
             instance._t = constr
@@ -110,16 +112,21 @@ cstruct = BType('cstruct: cstruct & struct in mem')     # will be laid out in me
 
 class _litint(int):
     def __new__(cls, *args_, **kwargs_):
-        constr, args, kwargs = extractConstructors(args_, kwargs_)
-        if len(args) == 1:
-            assert constr == litint
-            return super(cls, cls).__new__(cls, args[0])
-        elif len(args) == 2:
-            t, v = args
-            assert t == litint
-            return super(cls, cls).__new__(cls, v)
+        constrs, args, kwargs = extractConstructors(args_, kwargs_)
+        if constrs:
+            if len(constrs) != 1: raise NotYetImplemented()
+            constr = constrs[0]
+            if len(args) == 1:
+                assert constr == litint
+                return super(cls, cls).__new__(cls, args[0])
+            elif len(args) == 2:
+                t, v = args
+                assert t == litint
+                return super(cls, cls).__new__(cls, v)
+            else:
+                raise SyntaxError(f'Expected 1 argument, got {len(args)}')
         else:
-            raise SyntaxError(f'Expected 1 argument, got {len(args)}')
+            raise NotYetImplemented()
     @property
     def _t(self):
         return litint
@@ -133,12 +140,17 @@ litint = BType('litint: atom in mem').setConstructor(_litint).setCoercer(_litint
 
 class _litnum(float):
     def __new__(cls, *args_, **kwargs_):
-        constr, args, kwargs = extractConstructors(args_, kwargs_)
-        if len(args) == 1:
-            assert constr == litnum
-            return super(cls, cls).__new__(cls, args[0])
+        constrs, args, kwargs = extractConstructors(args_, kwargs_)
+        if constrs:
+            if len(constrs) != 1: raise NotYetImplemented()
+            constr = constrs[0]
+            if len(args) == 1:
+                assert constr == litnum
+                return super(cls, cls).__new__(cls, args[0])
+            else:
+                raise SyntaxError(f'Expected 1 argument, got {len(args)}')
         else:
-            raise SyntaxError(f'Expected 1 argument, got {len(args)}')
+            raise NotYetImplemented()
     @property
     def _t(self):
         return litnum
@@ -152,15 +164,20 @@ litnum = BType('litnum: atom in mem').setConstructor(_litnum)
 
 class _littxt(str):
     def __new__(cls, *args_, **kwargs_):
-        constr, args, kwargs = extractConstructors(args_, kwargs_)
-        if len(args) == 1:
-            return super(cls, cls).__new__(cls, args[0])
-        elif len(args) == 2:
-            t, v = args
-            assert t == littxt
-            return super(cls, cls).__new__(cls, v)
+        constrs, args, kwargs = extractConstructors(args_, kwargs_)
+        if constrs:
+            if len(constrs) != 1: raise NotYetImplemented()
+            constr = constrs[0]
+            if len(args) == 1:
+                return super(cls, cls).__new__(cls, args[0])
+            elif len(args) == 2:
+                t, v = args
+                assert t == littxt
+                return super(cls, cls).__new__(cls, v)
+            else:
+                raise SyntaxError(f'No args passed')
         else:
-            raise SyntaxError(f'No args passed')
+            raise NotYetImplemented()
     @property
     def _t(self):
         return littxt

@@ -10,8 +10,9 @@
 import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
-import builtins
-from coppertop.core import ErrSite, context, ProgrammerError, NotYetImplemented, Missing, raiseLess, firstValue
+import builtins, types
+from coppertop.utils import ErrSite, context, ProgrammerError, NotYetImplemented, Missing, raiseLess
+from coppertop._utils.misc import firstValue
 
 from bones import jones
 from bones.jones import BTypeError, BType as BTypeRoot
@@ -275,7 +276,7 @@ class BType(BTypeRoot):
             tArgs = (lhs,)
         elif isinstance(lhs, (list, tuple)):
             tArgs = lhs
-        elif isinstance(lhs, generator):
+        elif isinstance(lhs, types.GeneratorType):
             tArgs = tuple(lhs)
         else:
             raise BTypeError(f'lhs should be a BType, type, list or tuple - got {repr(lhs)}')
@@ -306,7 +307,10 @@ class BType(BTypeRoot):
     def __getitem__(self, rhs):  # type[rhs]
         if isinstance(rhs, int):
             # gets called by dict_keys | btype, also numpy float64 | btype
-            raise TypeError(f'__getitem__ - perhaps coming from `dict_keys | btype` or `np.float64 | btype`? self = {self}, rhs = {rhs}')
+            raise KeyError(f"Key '{rhs}' not found.")
+            print(rhs)
+            return NotImplemented
+            # raise TypeError(f'__getitem__ - perhaps coming from `dict_keys | btype` or `np.float64 | btype`? self = {self}, rhs = {rhs}')
         elif isinstance(rhs, tuple):
             return BTIntersection(*(self, ) + rhs)
         elif isinstance(rhs, str):
@@ -749,7 +753,7 @@ def ppT(t):
 
 def extractConstructors(args_, kwargs_):
     if args_ and isinstance(args_[0], Constructors):
-        constr, args = args_[0][0], args_[1:]
+        constr, args = args_[0], args_[1:]
     else:
         constr, args = Missing, args_
     return constr, args, kwargs_

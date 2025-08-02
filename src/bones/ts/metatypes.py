@@ -23,7 +23,7 @@ if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 __all__ = ['BType', 'BTypeError', 'SchemaError', 'extractConstructors']
 
 import itertools, builtins, collections, statistics
-from coppertop.core import ProgrammerError, NotYetImplemented, PathNotTested, Missing
+from coppertop.utils import ProgrammerError, NotYetImplemented, PathNotTested, Missing
 
 from bones.jones import Fits, SchemaError
 import bones.ts._type_lang.jones_type_manager
@@ -654,7 +654,8 @@ def _processA_(a_, schemaVars, lenWeakenings):
         try:
             tlid = sys._gtm.intersectionTlidFor(a_)
         except:
-            print('ponder some more', file=sys.stderr)
+            # print('ponder some more', file=sys.stderr)
+            pass
             # raise BTypeError("OPEN: Needs description")
     return Fits(True, schemaVars, len(a_) + lenWeakenings)
 

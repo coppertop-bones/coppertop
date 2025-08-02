@@ -10,19 +10,8 @@
 import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
-from coppertop.core._context import context
-from coppertop.core._sentinels import Missing, Null, Err, Void, EarlyExit
-from coppertop.core._errors import (ProgrammerError, CPTBError, NotYetImplemented, PathNotTested, UnhappyWomble, WTF,
-    ErrSite, handlersByErrSiteId)
-from coppertop.core._utils import raiseLess, assertIs, firstValue, firstKey, HookStdOutErrToLines
-
-ellipsis = type(...)
-dict_keys = type({}.keys())
-dict_values = type({}.values())
-dict_items = type({}.items())
-# function = type(lambda x:x)
-int = type(1)
-str = type('hello')
-bool = type(True)
-list_iter = type(iter([]))
-generator = type((x for x in []))
+from coppertop._utils.context import context
+from coppertop._utils.sentinels import Missing, Null, Err, Void, EarlyExit
+from coppertop._utils.errors import ProgrammerError, CPTBError, NotYetImplemented, PathNotTested, UnhappyWomble, WTF, \
+    ErrSite, handlersByErrSiteId, raiseLess, ImpossiblePathError
+from coppertop._utils.testing import assertIs, assertRaises

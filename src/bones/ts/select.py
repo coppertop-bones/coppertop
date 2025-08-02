@@ -12,7 +12,8 @@ import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 import builtins, types
-from coppertop.core import context, Missing, ProgrammerError, ErrSite, raiseLess, firstValue
+from coppertop.utils import context, Missing, ProgrammerError, ErrSite, raiseLess
+from coppertop._utils.misc import firstValue
 
 from bones import jones
 from bones.ts.metatypes import updateSchemaVarsWith, fitsWithin, BTFamily, BType, _btypeByClass, _BTypeById, BTUnion, \

@@ -8,7 +8,7 @@
 # **********************************************************************************************************************
 
 import collections, itertools
-from coppertop.core import Missing, context, ProgrammerError, NotYetImplemented
+from coppertop.utils import Missing, context, ProgrammerError, NotYetImplemented
 
 from bones.ts.core import bmtnul, bmtatm, bmtint, bmtuni, bmttup, bmtstr, bmtrec, bmtseq, bmtmap, bmtfnc, bmtsvr
 

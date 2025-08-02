@@ -10,9 +10,9 @@
 import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
-import inspect
+import inspect, types
 
-from coppertop.core._sentinels import Missing
+from coppertop._utils.sentinels import Missing
 
 handlersByErrSiteId = {}
 
@@ -54,6 +54,10 @@ def _ensureErrors():
         class WTF(CPTBError): pass
         sys._WTF = WTF
 
+    if not hasattr(sys, '_ImpossiblePathError'):
+        class ImpossiblePathError(CPTBError): pass
+        sys._ImpossiblePathError = ImpossiblePathError
+
 
 _ensureErrors()
 CPTBError = sys._CPTBError
@@ -62,6 +66,7 @@ NotYetImplemented = sys._NotYetImplemented
 PathNotTested = sys._PathNotTested
 UnhappyWomble = sys._UnhappyWomble
 WTF = sys._WTF
+ImpossiblePathError = sys._ImpossiblePathError
 
 
 
@@ -113,3 +118,50 @@ handlersByErrSiteId = {
     ('bones.kernel.parse_phrase', Missing, 'parsePhrase', 'name already defined'): '...',
 
 }
+
+
+_ignore = [
+    'IPython', 'ipykernel', 'pydevd', 'coppertop.pipe', '_pydev_imps._pydev_execfile', 'tornado', 'runpy', 'asyncio',
+    'traitlets'
+]
+
+def raiseLess(ex, includeMe=True):
+    tb = None
+    frame = inspect.currentframe()  # do not use `frameInfos = inspect.stack(0)` as it is much much slower
+    # discard the frames for add_traceback
+    if not includeMe:
+        if frame.f_code.co_name == 'raiseLess':
+            frame = frame.f_back
+    while True:
+        try:
+            # frame = sys._getframe(depth)
+            frame = frame.f_back
+            if not frame: break
+        except ValueError as e:
+            break
+        fullname = frame.f_globals['__name__'] + '.' + frame.f_code.co_name
+        # print(fullname)
+        if not [fullname for i in _ignore if fullname.startswith(i)]:
+            # print('-------- '+fullname)
+            tb = types.TracebackType(tb, frame, frame.f_lasti, frame.f_lineno)
+        else:
+            pass
+            # print(fullname)
+        if fullname == '__main__.<module>': break
+    hasPydev = False
+    hasIPython = False
+    if frame:
+        while True:
+            # frame = sys._getframe(depth)
+            frame = frame.f_back
+            if not frame: break
+            fullname = frame.f_globals['__name__'] + '.' + frame.f_code.co_name
+            # print(fullname)
+            if fullname.startswith("pydevd"): hasPydev = True
+            if fullname.startswith("IPython"): hasIPython = True
+    if hasPydev or hasIPython:
+        raise ex.with_traceback(tb) from None
+    else:
+        raise ex from None #ex.with_traceback(tb)
+
+

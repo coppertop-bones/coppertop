@@ -9,7 +9,7 @@
 
 import antlr4, traceback as tb, sys
 from typing import Text
-from coppertop.core import Missing
+from coppertop.utils import Missing
 
 from bones.jones import BTypeError
 from bones.ts.core import TLError
