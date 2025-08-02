@@ -55,7 +55,7 @@ import sys
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__)
 
 __all__ = [
-    'coppertop', 'nullary', 'unary', 'binary', 'ternary', '_', 'sig', 'context', 'typeOf', 'makeFn',
+    'coppertop', 'nullary', 'unary', 'binary', 'ternary', '_', 'sig', 'context', 'typeOf', 'asUnary',
     'fitsWithin', 'type'
 ]
 
@@ -302,16 +302,14 @@ if not hasattr(sys, '_coppertopImportFnHolder'):
 def fitsWithin(a, b):
     return origFitsWithin(a, b)
 
-def makeFn(*args):
+def asUnary(*args):
     if len(args) == 1:
-        name, _t, pyfn = Missing, Missing, args[0]
+        _t, pyfn = Missing, args[0]
     elif len(args) == 2:
-        name, _t, pyfn = Missing, args[0], args[1]
-    elif len(args) == 3:
-        name, _t, pyfn = args[0], args[1], args[2]
+        _t, pyfn = args[0], args[1]
     else:
         raise TypeError('Wrong number of args passed to partial', ErrSite("#1"))
-    modname, fnname, _, _, argNames, _, _, pass_tByT = _fnContext(pyfn, 'anon', name)
+    modname, fnname, _, _, argNames, _, _, pass_tByT = _fnContext(pyfn, 'anon', Missing)
     if _t is Missing:
         _t = BTFn(BTTuple(*[_py] * len(argNames)), _py)
     tvfn = tvfunc(
