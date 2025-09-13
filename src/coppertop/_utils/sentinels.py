@@ -21,37 +21,78 @@ def _ensureSentinels():
 
     # error sentinels - cf missing, null, nan in databases
 
-    # something should / could be there but it is definitely not there
+    # something that should / could be there, but it is definitely not there
     if not hasattr(sys, '_Missing'):
-        # OPEN: add a metaclass
-        class Missing:
+
+        # https://github.com/python/cpython/issues/105499
+        # types.UnionType is a basic type like int, str etc. It has no constructor and is the type of the result of str | int
+        # typing.Union on the other hand is not a type
+
+        # to be fair we are kind of breaking the rules to have isinstance(Missing, Missing) but sentinels are different,
+        # as can be seen in Python's use of int | None. The following implementation in typing.py means the
+        # __instancecheck__ method of a type in a Union is ignored - ugh
+
+        # class _UnionGenericAlias(_NotIterable, _GenericAlias, _root=True):
+        #     ...
+        #
+        #     def __instancecheck__(self, obj):
+        #         return self.__subclasscheck__(type(obj))
+        #
+        #     def __subclasscheck__(self, cls):
+        #         for arg in self.__args__:
+        #             if issubclass(cls, arg):
+        #                 return True
+
+        class MissingTypeMeta(type):
+            def __repr__(self):
+                # for pretty display in pycharm debugger
+                return 'MissingType'
+            def __str__(self):
+                # for pretty display in pycharm debugger
+                return 'MissingType'
+
+        class MissingType(type, metaclass=MissingTypeMeta):
+            def __instancecheck__(cls, instance):
+                return instance is sys._Missing
+            def __subclasscheck__(cls, instance):
+                return instance is MissingType
             def __bool__(self):
                 return False
             def __repr__(self):
                 # for pretty display in pycharm debugger
                 return 'Missing'
-            def __or__(self, other):
+            def __str__(self):
+                # for pretty display in pycharm debugger
+                return 'Missing'
+            def __or__(self, other):    # self | other
                 # see https://peps.python.org/pep-0604/
                 if (
-                        isinstance(other, type) or
-                        (t := typing.get_origin(other) is typing.Union) or
-                        t is types.UnionType
+                    isinstance(other, type) or
+                    (t := typing.get_origin(other)) is typing.Union or
+                    t is types.UnionType
                 ):
-                    return typing.Union[type(self), other]
+                    return typing.Union[self, other]
                 else:
                     return NotImplemented
-            def __ror__(self, other):
+            def __ror__(self, other):   # other | self
                 # see https://peps.python.org/pep-0604/
                 if (
-                        isinstance(other, type) or
-                        (t := typing.get_origin(other) is typing.Union) or
-                        t is types.UnionType
+                    isinstance(other, type) or
+                    (t := typing.get_origin(other)) is typing.Union or
+                    t is types.UnionType
                 ):
-                    return typing.Union[type(self), other]
+                    return typing.Union[self, other]
                 else:
                     return NotImplemented
-        sys._Missing = Missing()
-        sys._Missing._t = sys._Missing
+
+        class Missing(metaclass=MissingType):
+            def __new__(cls, *args, **kwargs):
+                if not hasattr(sys, '_Missing'):
+                    sys._Missing = cls
+                    sys._Missing._t = cls
+                return sys._Missing
+
+        Missing()
 
 
     # the null set
@@ -114,3 +155,4 @@ EarlyExit = sys._ExitEarly
 
 
 if hasattr(sys, '_TRACE_IMPORTS') and sys._TRACE_IMPORTS: print(__name__ + ' - done')
+
