@@ -84,6 +84,12 @@ def _ensureSentinels():
                     return typing.Union[self, other]
                 else:
                     return NotImplemented
+            def __rshift__(self, other):    # self >> other
+                return NotImplemented
+            def __rrshift__(self, other):   # other >> self
+                return other
+            def __contains__(self, other):  # other in self
+                return False
 
         class Missing(metaclass=MissingType):
             def __new__(cls, *args, **kwargs):

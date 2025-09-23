@@ -199,6 +199,12 @@ class tvoverload(jones.JOverload):
             pSC, results = self.cache
 
             hasValue = jones.sc_fillQuerySlotWithBTypesOf(pSC, args, _btypeByClass, py, _CoWProxy)
+            # temporary hack since we've converted Missing to be a type yet for function selection it is really a sentinel
+            if not hasValue:
+                for arg in args:
+                    if arg is Missing:
+                        hasValue = True
+                        break
 
             resultId = jones.sc_getFnId(pSC)
 
@@ -522,11 +528,14 @@ class Fred():
 
 sys._typeOf = _typeOf               # required by other modules - do not remove, OPEN: add jones.typeOf to use instead
 
-jones.set_typeOf(_typeOf)
-jones.set_distancesEtAl(_distancesEtAl)
-jones.set_fitsWithin(fitsWithin)
-jones.set_tvfuncErrorCallback1(_tvfuncErrorCallback1)
-jones.set_tvfuncErrorCallback2(_tvfuncErrorCallback2)
-jones.set_updateSchemaVarsWith(metatypes.updateSchemaVarsWith)
-jones.set_BType_py(py)
+try:
+    jones.set_typeOf(_typeOf)
+    jones.set_distancesEtAl(_distancesEtAl)
+    jones.set_fitsWithin(fitsWithin)
+    jones.set_tvfuncErrorCallback1(_tvfuncErrorCallback1)
+    jones.set_tvfuncErrorCallback2(_tvfuncErrorCallback2)
+    jones.set_updateSchemaVarsWith(metatypes.updateSchemaVarsWith)
+    jones.set_BType_py(py)
+except TypeError as ex:
+    print(repr(ex))
 # OPEN: add a function to check all call-backs etc are set

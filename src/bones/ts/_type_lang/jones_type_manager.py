@@ -187,7 +187,7 @@ class BType(BTypeRoot):
                     if (constructor := t._constructor) is not Missing:
                         break
         if not constructor:
-            raise ProgrammerError(f'No constructor defined for type "{self}"')
+            raise TypeError(f'No constructor defined for type "{self}"')
         if args and isinstance(args[0], Constructors):
             cs = Constructors(args[0])
             cs.append(self)
